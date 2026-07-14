@@ -66,22 +66,45 @@ const PomodoroTimer = () => {
   }, [isRunning, isWork]);
 
   const playSound = () => {
-    // Create a simple beep using Web Audio API
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
-    
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.5);
+    try {
+      // Try multiple beeps for phone compatibility
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+
+          osc.frequency.value = 900 + (i * 200);
+          osc.type = 'sine';
+
+          gain.gain.setValueAtTime(0.4, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+          osc.start(audioContext.currentTime);
+          osc.stop(audioContext.currentTime + 0.3);
+        }, i * 150);
+      }
+
+      // Visual feedback on phone
+      showNotificationFlash();
+    } catch (e) {
+      console.log('Audio not available, showing visual notification');
+      showNotificationFlash();
+    }
+  };
+
+  const showNotificationFlash = () => {
+    const flash = document.getElementById('notification-flash');
+    if (flash) {
+      flash.style.opacity = '1';
+      setTimeout(() => {
+        flash.style.opacity = '0';
+      }, 300);
+    }
   };
 
   const toggleTimer = () => setIsRunning(!isRunning);
@@ -106,9 +129,9 @@ const PomodoroTimer = () => {
     ? 1 - (timeLeft / WORK_TIME)
     : 1 - (timeLeft / BREAK_TIME);
 
-  const bgColor = isWork ? '#1a1f2e' : '#1a2e1f';
-  const accentColor = isWork ? '#00d9ff' : '#4ade80';
-  const darkAccent = isWork ? '#0099cc' : '#2d7a4a';
+  const bgColor = '#000000';
+  const accentColor = '#ff006e';
+  const darkAccent = '#ff1493';
 
   return (
     <div
@@ -119,12 +142,28 @@ const PomodoroTimer = () => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        color: '#e5e7eb',
+        fontFamily: '"Fredoka One", "Righteous", sans-serif',
+        color: accentColor,
         padding: '20px',
         transition: 'background 0.6s ease',
       }}
     >
+      {/* Notification Flash */}
+      <div
+        id="notification-flash"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: accentColor,
+          opacity: '0',
+          pointerEvents: 'none',
+          transition: 'opacity 0.3s ease',
+          zIndex: 9999,
+        }}
+      />
       {/* Header: Streak & Sessions */}
       <div
         style={{
@@ -137,7 +176,8 @@ const PomodoroTimer = () => {
           fontSize: '14px',
           textTransform: 'uppercase',
           letterSpacing: '1px',
-          color: '#9ca3af',
+          color: accentColor,
+          fontWeight: 'bold',
         }}
       >
         <div>
@@ -205,10 +245,11 @@ const PomodoroTimer = () => {
           <div
             style={{
               fontSize: '12px',
-              color: '#9ca3af',
+              color: accentColor,
               marginTop: '8px',
               textTransform: 'uppercase',
               letterSpacing: '1px',
+              fontWeight: 'bold',
             }}
           >
             {isWork ? 'Focus Time' : 'Take a Break'}
@@ -229,13 +270,13 @@ const PomodoroTimer = () => {
           style={{
             padding: '12px 24px',
             fontSize: '14px',
-            fontWeight: '600',
+            fontWeight: 'bold',
             textTransform: 'uppercase',
             letterSpacing: '1px',
             background: accentColor,
-            color: '#1a1f2e',
+            color: '#000000',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '8px',
             cursor: 'pointer',
             transition: 'all 0.2s',
           }}
@@ -249,23 +290,23 @@ const PomodoroTimer = () => {
           style={{
             padding: '12px 24px',
             fontSize: '14px',
-            fontWeight: '600',
+            fontWeight: 'bold',
             textTransform: 'uppercase',
             letterSpacing: '1px',
             background: 'transparent',
-            color: '#9ca3af',
-            border: `1px solid #4b5563`,
-            borderRadius: '6px',
+            color: accentColor,
+            border: `2px solid ${accentColor}`,
+            borderRadius: '8px',
             cursor: 'pointer',
             transition: 'all 0.2s',
           }}
           onMouseOver={(e) => {
-            e.target.style.borderColor = accentColor;
-            e.target.style.color = accentColor;
+            e.target.style.borderColor = darkAccent;
+            e.target.style.color = darkAccent;
           }}
           onMouseOut={(e) => {
-            e.target.style.borderColor = '#4b5563';
-            e.target.style.color = '#9ca3af';
+            e.target.style.borderColor = accentColor;
+            e.target.style.color = accentColor;
           }}
         >
           Reset
@@ -275,23 +316,23 @@ const PomodoroTimer = () => {
           style={{
             padding: '12px 24px',
             fontSize: '14px',
-            fontWeight: '600',
+            fontWeight: 'bold',
             textTransform: 'uppercase',
             letterSpacing: '1px',
             background: 'transparent',
-            color: '#9ca3af',
-            border: `1px solid #4b5563`,
-            borderRadius: '6px',
+            color: accentColor,
+            border: `2px solid ${accentColor}`,
+            borderRadius: '8px',
             cursor: 'pointer',
             transition: 'all 0.2s',
           }}
           onMouseOver={(e) => {
-            e.target.style.borderColor = accentColor;
-            e.target.style.color = accentColor;
+            e.target.style.borderColor = darkAccent;
+            e.target.style.color = darkAccent;
           }}
           onMouseOut={(e) => {
-            e.target.style.borderColor = '#4b5563';
-            e.target.style.color = '#9ca3af';
+            e.target.style.borderColor = accentColor;
+            e.target.style.color = accentColor;
           }}
         >
           Skip
@@ -304,8 +345,9 @@ const PomodoroTimer = () => {
           position: 'absolute',
           bottom: '20px',
           fontSize: '12px',
-          color: '#6b7280',
+          color: accentColor,
           textAlign: 'center',
+          opacity: '0.8',
         }}
       >
         Work: 25 min | Break: 5 min
