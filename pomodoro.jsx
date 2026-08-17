@@ -3,12 +3,11 @@ import React, { useState, useEffect, useRef } from 'react';
 const PomodoroTimer = () => {
   const USERS = ['GP47', 'Pri', 'Nikki', 'Sid'];
   const DEFAULT_HABITS = [
-    { id: 1, name: 'Exercise', category: '💪' },
-    { id: 2, name: 'Meditation', category: '🧘' },
-    { id: 3, name: 'Reading', category: '📚' },
-    { id: 4, name: 'Coding', category: '💻' },
-    { id: 5, name: 'Sleep 8hrs', category: '😴' },
-    { id: 6, name: 'Water intake', category: '💧' },
+    { id: 1, name: 'Exercise', category: '💪', type: 'checkbox' },
+    { id: 2, name: 'AI Reading', category: '🤖', type: 'checkbox' },
+    { id: 3, name: 'Sleep 8hrs', category: '😴', type: 'checkbox' },
+    { id: 4, name: 'Brush Twice Daily', category: '🪥', type: 'checkbox' },
+    { id: 5, name: 'Water Intake', category: '💧', type: 'counter', goal: 8 },
   ];
 
   // Timer state
@@ -67,6 +66,7 @@ const PomodoroTimer = () => {
       completed: false,
       streak: 0,
       bestStreak: 0,
+      count: 0, // for counter type habits
     })),
     pomodoro: {
       sessions: 0,
@@ -95,6 +95,10 @@ const PomodoroTimer = () => {
           habit.streak = 0;
         }
         habit.completed = false;
+        // Reset counter for counter-type habits
+        if (habit.type === 'counter') {
+          habit.count = 0;
+        }
       });
 
       // Reset daily Pomodoro stats
@@ -188,8 +192,20 @@ const PomodoroTimer = () => {
   const toggleHabit = (habitId) => {
     const updated = { ...allUsers };
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
-    if (habit) {
+    if (habit && habit.type === 'checkbox') {
       habit.completed = !habit.completed;
+      updateCompletionPercentage(updated);
+      setAllUsers(updated);
+      saveData(updated);
+    }
+  };
+
+  const updateWaterCount = (habitId, delta) => {
+    const updated = { ...allUsers };
+    const habit = updated[currentUser].habits.find((h) => h.id === habitId);
+    if (habit && habit.type === 'counter') {
+      habit.count = Math.max(0, habit.count + delta);
+      habit.completed = habit.count >= (habit.goal || 8);
       updateCompletionPercentage(updated);
       setAllUsers(updated);
       saveData(updated);
@@ -303,20 +319,20 @@ const PomodoroTimer = () => {
           {userData.habits.map((habit) => (
             <div
               key={habit.id}
-              onClick={() => toggleHabit(habit.id)}
               style={{
                 padding: '15px',
                 marginBottom: '10px',
                 background: habit.completed ? accentColor : '#1a1a2e',
                 color: habit.completed ? '#0f0f1e' : accentColor,
                 borderRadius: '10px',
-                cursor: 'pointer',
+                cursor: habit.type === 'checkbox' ? 'pointer' : 'default',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 border: `2px solid ${accentColor}`,
                 transition: 'all 0.2s',
               }}
+              onClick={() => habit.type === 'checkbox' && toggleHabit(habit.id)}
             >
               <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                 <span style={{ fontSize: '24px' }}>{habit.category}</span>
@@ -325,7 +341,52 @@ const PomodoroTimer = () => {
                   <div style={{ fontSize: '12px', opacity: 0.8 }}>Streak: {habit.streak}</div>
                 </div>
               </div>
-              <div style={{ fontSize: '24px' }}>{habit.completed ? '✅' : '⭕'}</div>
+
+              {habit.type === 'checkbox' && (
+                <div style={{ fontSize: '24px' }}>{habit.completed ? '✅' : '⭕'}</div>
+              )}
+
+              {habit.type === 'counter' && (
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => updateWaterCount(habit.id, -1)}
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      background: 'transparent',
+                      border: `2px solid ${habit.completed ? '#0f0f1e' : accentColor}`,
+                      color: habit.completed ? '#0f0f1e' : accentColor,
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    −
+                  </button>
+                  <div style={{ minWidth: '40px', textAlign: 'center', fontWeight: 'bold', fontSize: '18px' }}>
+                    {habit.count}/{habit.goal}
+                  </div>
+                  <button
+                    onClick={() => updateWaterCount(habit.id, 1)}
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      background: habit.count >= habit.goal ? '#0f0f1e' : 'transparent',
+                      border: `2px solid ${habit.completed ? '#0f0f1e' : accentColor}`,
+                      color: habit.completed ? '#0f0f1e' : accentColor,
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              )}
             </div>
           ))}
 
