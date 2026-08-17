@@ -218,9 +218,10 @@ const PomodoroTimer = () => {
   const seconds = timeLeft % 60;
   const progress = isWork ? 1 - (timeLeft / WORK_TIME) : 1 - (timeLeft / BREAK_TIME);
 
-  const bgColor = '#000000';
-  const accentColor = '#ff006e';
-  const darkAccent = '#ff1493';
+  const bgColor = '#0f0f1e';
+  const accentColor = '#c8b6ff';
+  const darkAccent = '#a78bde';
+  const textColor = '#e8e8f0';
 
   const userData = allUsers[currentUser] || createNewUserData();
   const completedHabits = userData.habits.filter((h) => h.completed).length;
@@ -240,7 +241,7 @@ const PomodoroTimer = () => {
       `}</style>
 
       {/* User Selector */}
-      <div style={{ padding: '20px', display: 'flex', gap: '10px', borderBottom: `2px solid ${accentColor}` }}>
+      <div style={{ padding: '20px', display: 'flex', gap: '10px', borderBottom: `2px solid #333333` }}>
         {USERS.map((user) => (
           <button
             key={user}
@@ -306,8 +307,8 @@ const PomodoroTimer = () => {
               style={{
                 padding: '15px',
                 marginBottom: '10px',
-                background: habit.completed ? accentColor : '#222',
-                color: habit.completed ? '#000' : accentColor,
+                background: habit.completed ? accentColor : '#1a1a2e',
+                color: habit.completed ? '#0f0f1e' : accentColor,
                 borderRadius: '10px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -329,7 +330,7 @@ const PomodoroTimer = () => {
           ))}
 
           {completedHabits >= Math.ceil(userData.habits.length * 0.7) && (
-            <div style={{ marginTop: '30px', padding: '15px', background: '#2d5f2e', borderRadius: '10px', textAlign: 'center', fontWeight: 'bold' }}>
+            <div style={{ marginTop: '30px', padding: '15px', background: '#2a2547', borderRadius: '10px', textAlign: 'center', fontWeight: 'bold', border: `2px solid ${accentColor}` }}>
               🏆 Daily Goal Met! 70%+ habits completed
             </div>
           )}
@@ -417,7 +418,7 @@ const PomodoroTimer = () => {
             {USERS.map((user, idx) => {
               const userSessions = allUsers[user]?.pomodoro.sessions || 0;
               return (
-                <div key={user} style={{ padding: '12px', marginBottom: '8px', background: '#222', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={user} style={{ padding: '12px', marginBottom: '8px', background: '#1a1a2e', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${accentColor}` }}>
                   <span style={{ fontWeight: 'bold' }}>#{idx + 1} {user}</span>
                   <span>{userSessions} sessions</span>
                 </div>
@@ -431,7 +432,7 @@ const PomodoroTimer = () => {
             {USERS.map((user, idx) => {
               const userXP = allUsers[user]?.pomodoro.xp || 0;
               return (
-                <div key={user} style={{ padding: '12px', marginBottom: '8px', background: '#222', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={user} style={{ padding: '12px', marginBottom: '8px', background: '#1a1a2e', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${accentColor}` }}>
                   <span style={{ fontWeight: 'bold' }}>#{idx + 1} {user}</span>
                   <span>{userXP} XP (Level {Math.floor(userXP / 100) + 1})</span>
                 </div>
