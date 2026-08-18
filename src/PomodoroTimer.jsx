@@ -828,6 +828,10 @@ const PomodoroTimer = ({ user }) => {
           <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>
             {currentUser}'s Daily Habits
           </div>
+          <div style={{ fontSize: '12px', color: '#999', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
+            <span>📅 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <span>⏰ Reset in {timeUntilReset}</span>
+          </div>
           <div style={{ fontSize: '14px', color: '#999', marginBottom: '30px' }}>
             {(() => {
               const today = new Date().toISOString().split('T')[0];
