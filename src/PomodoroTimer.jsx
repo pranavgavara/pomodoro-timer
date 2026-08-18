@@ -383,37 +383,31 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const toggleHabit = (habitId) => {
-    if (!currentUser) return; // Safety check
+    if (!currentUser) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return; // Ensure user exists
-    
+    if (!updated[currentUser]) return;
+
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'checkbox') {
       habit.completed = !habit.completed;
-      
-      // Update only current user
-      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, userDataToSave);
+      saveToFirebase(currentUser, updated[currentUser]);
     }
   };
 
   const updateWaterCount = (habitId, delta) => {
-    if (!currentUser) return; // Safety check
+    if (!currentUser) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return; // Ensure user exists
+    if (!updated[currentUser]) return;
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'counter') {
       habit.count = Math.max(0, habit.count + delta);
       habit.completed = habit.count >= (habit.goal || 8);
-
-      // Update only current user
-      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, userDataToSave);
+      saveToFirebase(currentUser, updated[currentUser]);
     }
   };
 
@@ -438,10 +432,9 @@ const PomodoroTimer = ({ user }) => {
       updated[currentUser].pomodoro.dailyXP += xpGain;
       updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
 
-      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, userDataToSave);
+      saveToFirebase(currentUser, updated[currentUser]);
 
       playSound();
       showToast(`✅ ${habit.name} session added! +${xpGain} XP`, 'success');
@@ -469,10 +462,9 @@ const PomodoroTimer = ({ user }) => {
       updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - xpGain);
       updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
 
-      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, userDataToSave);
+      saveToFirebase(currentUser, updated[currentUser]);
 
       showToast(`↶ ${habit.name} session removed! -${xpGain} XP`, 'info');
     }
