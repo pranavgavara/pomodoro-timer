@@ -652,9 +652,13 @@ const PomodoroTimer = ({ user }) => {
     }
   };
 
-  const updateCompletionPercentage = (users) => {
-    const completed = users[currentUser].habits.filter((h) => h.completed).length;
-    users[currentUser].stats.completionPercentage = Math.round((completed / users[currentUser].habits.length) * 100);
+  const updateCompletionPercentage = (users, bonusData = bonusTaskCompleted) => {
+    const today = new Date().toISOString().split('T')[0];
+    const habitCompleted = users[currentUser].habits.filter((h) => h.completed).length;
+    const myloCompleted = bonusData[today] ? 1 : 0;
+    const totalCompleted = habitCompleted + myloCompleted;
+    const totalItems = users[currentUser].habits.length + 1; // 7 habits + 1 Mylo
+    users[currentUser].stats.completionPercentage = Math.round((totalCompleted / totalItems) * 100);
   };
 
   const completeBonusTask = () => {
@@ -832,7 +836,13 @@ const PomodoroTimer = ({ user }) => {
             {currentUser}'s Daily Habits
           </div>
           <div style={{ fontSize: '14px', color: '#999', marginBottom: '30px' }}>
-            Completion: {userData.stats.completionPercentage}% ({completedHabits}/{userData.habits.length})
+            {(() => {
+              const today = new Date().toISOString().split('T')[0];
+              const myloCompleted = bonusTaskCompleted[today] ? 1 : 0;
+              const totalCount = completedHabits + myloCompleted;
+              const totalItems = userData.habits.length + 1;
+              return `Completion: ${userData.stats.completionPercentage}% (${totalCount}/${totalItems})`;
+            })()}
           </div>
 
           {userData.habits.map((habit) => (
