@@ -32,6 +32,7 @@ const PomodoroTimer = ({ user }) => {
   const migrationDoneRef = useRef(false);
 
   const [toasts, setToasts] = useState([]);
+  const toastIdRef = useRef(0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
     const saved = localStorage.getItem('notificationsEnabled');
     return saved ? JSON.parse(saved) : false;
@@ -60,8 +61,8 @@ const PomodoroTimer = ({ user }) => {
   };
 
   // Show toast notification
-  const showToast = (message, type = 'info', duration = 4000) => {
-    const id = Date.now();
+  const showToast = (message, type = 'info', duration = 3000) => {
+    const id = ++toastIdRef.current;
     const toast = { id, message, type };
     setToasts((prev) => [...prev, toast]);
     setTimeout(() => {
