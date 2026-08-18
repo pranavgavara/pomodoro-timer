@@ -294,6 +294,68 @@ const PomodoroTimer = ({ user }) => {
     return () => unsubscribe();
   }, []);
 
+  // Daily reset at midnight
+  useEffect(() => {
+    if (!currentUser || Object.keys(allUsers).length === 0) return;
+
+    const checkAndReset = () => {
+      const lastResetDate = localStorage.getItem('lastResetDate');
+      const today = new Date().toISOString().split('T')[0];
+
+      if (lastResetDate !== today) {
+        console.log('Performing daily reset...');
+        saveDailyCompletion();
+
+        const updated = JSON.parse(JSON.stringify(allUsers));
+        USERS.forEach((userName) => {
+          if (updated[userName]) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            const yesterdayData = completionHistory[yesterdayStr];
+            const wasCompleted = yesterdayData?.[userName]?.completed || false;
+
+            updated[userName].habits.forEach((habit) => {
+              if (habit.type === 'checkbox' || habit.type === 'counter') {
+                habit.completed = false;
+                if (habit.type === 'counter') habit.count = 0;
+                if (wasCompleted) {
+                  habit.streak = (habit.streak || 0) + 1;
+                  habit.bestStreak = Math.max(habit.bestStreak || 0, habit.streak);
+                } else {
+                  habit.streak = 0;
+                }
+              } else if (habit.type === 'pomodoro') {
+                habit.sessionsCompleted = 0;
+                habit.completed = false;
+                if (wasCompleted) {
+                  habit.streak = (habit.streak || 0) + 1;
+                  habit.bestStreak = Math.max(habit.bestStreak || 0, habit.streak);
+                } else {
+                  habit.streak = 0;
+                }
+              }
+            });
+
+            updated[userName].pomodoro.sessionsToday = 0;
+            updated[userName].pomodoro.dailyXP = 0;
+            updated[userName].stats.completionPercentage = 0;
+
+            saveToFirebase(userName, updated[userName]);
+          }
+        });
+
+        setAllUsers(updated);
+        localStorage.setItem('lastResetDate', today);
+        showToast('📅 Daily reset! New habits unlocked for today', 'success');
+      }
+    };
+
+    checkAndReset();
+    const interval = setInterval(checkAndReset, 60000);
+    return () => clearInterval(interval);
+  }, [currentUser, allUsers, completionHistory]);
+
 
   const createNewUserData = () => ({
     habits: DEFAULT_HABITS.map((h) => ({
