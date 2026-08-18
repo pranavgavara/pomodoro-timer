@@ -194,12 +194,22 @@ const PomodoroTimer = ({ user }) => {
       clearTimeout(loadTimeout);
       if (snapshot.exists()) {
         const data = snapshot.val();
-        // Migration: add missing habits to existing users (only once)
+        // Migration: ensure all habits have proper structure (only once)
         if (!migrationDoneRef.current) {
           migrationDoneRef.current = true;
           let needsSave = false;
           USERS.forEach((userName) => {
             if (data[userName]) {
+              // Ensure all habits have required fields from DEFAULT_HABITS
+              data[userName].habits = data[userName].habits.map((habit) => {
+                const defaultHabit = DEFAULT_HABITS.find((h) => h.id === habit.id);
+                if (defaultHabit && (!habit.type || !habit.category || !habit.name)) {
+                  needsSave = true;
+                  return { ...defaultHabit, ...habit };
+                }
+                return habit;
+              });
+              // Add missing habits
               const existingHabitIds = new Set(data[userName].habits.map((h) => h.id));
               DEFAULT_HABITS.forEach((defaultHabit) => {
                 if (!existingHabitIds.has(defaultHabit.id)) {
