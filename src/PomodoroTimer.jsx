@@ -671,12 +671,43 @@ const PomodoroTimer = ({ user }) => {
     setAllUsers(updated);
     saveToFirebase(currentUser, updated[currentUser]);
 
-    // Save bonus task completion
+    // Save bonus task completion - immediately update local state
+    const bonusData = { completedBy: currentUser, timestamp: new Date().toISOString() };
     const bonusRef = ref(database, `bonusTask/${today}`);
-    set(bonusRef, { completedBy: currentUser, timestamp: new Date().toISOString() });
+    set(bonusRef, bonusData);
+    setBonusTaskCompleted({ ...bonusTaskCompleted, [today]: bonusData });
 
     showToast(`🐕 ${currentUser} walked Mylo! +20 XP bonus`, 'success');
     playSound();
+  };
+
+  const removeBonusTask = () => {
+    if (!currentUser) return;
+    const today = new Date().toISOString().split('T')[0];
+
+    if (!bonusTaskCompleted[today] || bonusTaskCompleted[today].completedBy !== currentUser) return;
+
+    const updated = JSON.parse(JSON.stringify(allUsers));
+
+    // Remove 20 XP
+    updated[currentUser].pomodoro.xp = Math.max(0, updated[currentUser].pomodoro.xp - 20);
+    updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - 20);
+    updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+
+    // Update Firebase
+    setAllUsers(updated);
+    saveToFirebase(currentUser, updated[currentUser]);
+
+    // Remove from Firebase
+    const bonusRef = ref(database, `bonusTask/${today}`);
+    set(bonusRef, null);
+
+    // Update local state
+    const newBonusState = { ...bonusTaskCompleted };
+    delete newBonusState[today];
+    setBonusTaskCompleted(newBonusState);
+
+    showToast(`↶ Bonus task removed! -20 XP`, 'info');
   };
 
   const toggleTimer = () => {
@@ -946,37 +977,67 @@ const PomodoroTimer = ({ user }) => {
           {/* Bonus Task Section */}
           <div style={{ marginTop: '30px', padding: '20px', background: '#1a2a1e', borderRadius: '12px', border: '2px solid #7FFF00' }}>
             <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: '#7FFF00' }}>🐕 Daily Bonus Task</div>
-            <div style={{
-              padding: '15px',
-              background: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? '#333' : '#0f0f1e',
-              borderRadius: '8px',
-              border: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? '2px solid #999' : '2px solid #7FFF00',
-              cursor: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? 'default' : 'pointer',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              opacity: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? 0.6 : 1,
-            }}
-            onClick={() => {
+            {(() => {
               const today = new Date().toISOString().split('T')[0];
-              if (!bonusTaskCompleted[today]) {
-                completeBonusTask();
-              }
-            }}>
-              <div>
-                <div style={{ fontWeight: 'bold', color: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? '#999' : '#7FFF00', marginBottom: '5px' }}>
-                  Take Mylo for a Walk
+              const completed = bonusTaskCompleted[today];
+              const isCompletedByCurrentUser = completed && completed.completedBy === currentUser;
+
+              return (
+                <div style={{
+                  padding: '15px',
+                  background: completed ? '#333' : '#0f0f1e',
+                  borderRadius: '8px',
+                  border: completed ? '2px solid #999' : '2px solid #7FFF00',
+                  cursor: !completed ? 'pointer' : (isCompletedByCurrentUser ? 'pointer' : 'default'),
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  opacity: completed && !isCompletedByCurrentUser ? 0.5 : 1,
+                }}
+                onClick={() => {
+                  if (!completed) {
+                    completeBonusTask();
+                  } else if (isCompletedByCurrentUser) {
+                    removeBonusTask();
+                  }
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', color: completed ? '#999' : '#7FFF00', marginBottom: '5px' }}>
+                      Take Mylo for a Walk
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#999' }}>
+                      {completed
+                        ? `✅ Completed by ${completed.completedBy}`
+                        : 'First one to complete earns 20 XP!'}
+                    </div>
+                  </div>
+                  {!completed && (
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#7FFF00' }}>+20 XP</div>
+                  )}
+                  {isCompletedByCurrentUser && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeBonusTask();
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        background: 'transparent',
+                        color: '#ff6b6b',
+                        border: '2px solid #ff6b6b',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      ↶ Undo
+                    </button>
+                  )}
                 </div>
-                <div style={{ fontSize: '12px', color: '#999' }}>
-                  {bonusTaskCompleted[new Date().toISOString().split('T')[0]]
-                    ? `✅ Completed by ${bonusTaskCompleted[new Date().toISOString().split('T')[0]].completedBy}`
-                    : 'First one to complete earns 20 XP!'}
-                </div>
-              </div>
-              {!bonusTaskCompleted[new Date().toISOString().split('T')[0]] && (
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#7FFF00' }}>+20 XP</div>
-              )}
-            </div>
+              );
+            })()}
           </div>
 
           {/* View Others Section */}
