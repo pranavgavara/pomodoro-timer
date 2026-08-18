@@ -427,6 +427,36 @@ const PomodoroTimer = ({ user }) => {
     }
   };
 
+  const removePomodoroSession = (habitId) => {
+    if (!currentUser) return;
+    const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) return;
+
+    const habit = updated[currentUser].habits.find((h) => h.id === habitId);
+    if (habit && habit.type === 'pomodoro' && habit.sessionsCompleted > 0) {
+      habit.sessionsCompleted -= 1;
+      if (habit.sessionsCompleted < habit.sessionsRequired) {
+        habit.completed = false;
+      }
+
+      updated[currentUser].pomodoro.sessions = Math.max(0, updated[currentUser].pomodoro.sessions - 1);
+      updated[currentUser].pomodoro.sessionsToday = Math.max(0, updated[currentUser].pomodoro.sessionsToday - 1);
+
+      const bonus = (updated[currentUser].pomodoro.sessionsToday + 1) <= 3 ? 10 : 0;
+      const xpGain = 10 + bonus;
+      updated[currentUser].pomodoro.xp = Math.max(0, updated[currentUser].pomodoro.xp - xpGain);
+      updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - xpGain);
+      updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+
+      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
+      updateCompletionPercentage(updated);
+      setAllUsers(updated);
+      saveToFirebase(currentUser, userDataToSave);
+
+      showToast(`↶ ${habit.name} session removed! -${xpGain} XP`, 'info');
+    }
+  };
+
   const updateCompletionPercentage = (users) => {
     const completed = users[currentUser].habits.filter((h) => h.completed).length;
     users[currentUser].stats.completionPercentage = Math.round((completed / users[currentUser].habits.length) * 100);
@@ -583,7 +613,7 @@ const PomodoroTimer = ({ user }) => {
               )}
 
               {habit.type === 'pomodoro' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{
                     width: '60px',
                     height: '8px',
@@ -619,8 +649,27 @@ const PomodoroTimer = ({ user }) => {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    ✓ Done
+                    ✓ Add
                   </button>
+                  {habit.sessionsCompleted > 0 && (
+                    <button
+                      onClick={() => removePomodoroSession(habit.id)}
+                      style={{
+                        padding: '6px 12px',
+                        background: 'transparent',
+                        color: '#ff6b6b',
+                        border: '2px solid #ff6b6b',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        fontFamily: 'inherit',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      ↶ Undo
+                    </button>
+                  )}
                 </div>
               )}
 
