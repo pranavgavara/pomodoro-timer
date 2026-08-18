@@ -1558,6 +1558,151 @@ const PomodoroTimer = ({ user }) => {
             })}
           </div>
 
+          {/* Reset Daily Habits */}
+          <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: accentColor }}>📅 Reset Daily Habits</div>
+            <p style={{ fontSize: '12px', color: '#999', marginBottom: '15px' }}>Clears today's habit progress (checkboxes, counters) but keeps XP/levels</p>
+            <button
+              onClick={() => {
+                if (window.confirm('Reset ALL users daily habits? XP and levels stay the same.')) {
+                  const updated = JSON.parse(JSON.stringify(allUsers));
+                  USERS.forEach((userName) => {
+                    updated[userName].habits.forEach((habit) => {
+                      if (habit.type === 'checkbox' || habit.type === 'counter') {
+                        habit.completed = false;
+                        if (habit.type === 'counter') habit.count = 0;
+                      } else if (habit.type === 'pomodoro') {
+                        habit.sessionsCompleted = 0;
+                        habit.completed = false;
+                      }
+                    });
+                    updated[userName].pomodoro.sessionsToday = 0;
+                    updated[userName].pomodoro.dailyXP = 0;
+                    updated[userName].stats.completionPercentage = 0;
+                    saveToFirebase(userName, updated[userName]);
+                  });
+                  setAllUsers(updated);
+                  setBonusTaskCompleted({});
+                  showToast('✅ Reset all daily habits', 'success');
+                }
+              }}
+              style={{
+                padding: '10px 20px',
+                background: '#4a90e2',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                fontFamily: 'inherit',
+              }}
+            >
+              Reset All Daily Habits
+            </button>
+          </div>
+
+          {/* Reset Streaks */}
+          <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: accentColor }}>🔥 Reset Streaks</div>
+            <p style={{ fontSize: '12px', color: '#999', marginBottom: '15px' }}>Clears streak counters but keeps best streaks</p>
+            <button
+              onClick={() => {
+                if (window.confirm('Reset all current streaks? Best streaks are preserved.')) {
+                  const updated = JSON.parse(JSON.stringify(allUsers));
+                  USERS.forEach((userName) => {
+                    updated[userName].habits.forEach((habit) => {
+                      habit.streak = 0;
+                    });
+                    saveToFirebase(userName, updated[userName]);
+                  });
+                  setAllUsers(updated);
+                  showToast('✅ Reset all streaks', 'success');
+                }
+              }}
+              style={{
+                padding: '10px 20px',
+                background: '#f39c12',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                fontFamily: 'inherit',
+              }}
+            >
+              Reset All Streaks
+            </button>
+          </div>
+
+          {/* Force Daily Reset */}
+          <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: accentColor }}>⏰ Force Daily Reset</div>
+            <p style={{ fontSize: '12px', color: '#999', marginBottom: '15px' }}>Manually trigger midnight reset logic</p>
+            <button
+              onClick={() => {
+                if (window.confirm('Force daily reset now? Habits will clear and streaks will update.')) {
+                  saveDailyCompletion();
+                  const updated = JSON.parse(JSON.stringify(allUsers));
+                  USERS.forEach((userName) => {
+                    if (updated[userName]) {
+                      const yesterday = new Date();
+                      yesterday.setDate(yesterday.getDate() - 1);
+                      const yesterdayStr = yesterday.toISOString().split('T')[0];
+                      const yesterdayData = completionHistory[yesterdayStr];
+                      const wasCompleted = yesterdayData?.[userName]?.completed || false;
+
+                      updated[userName].habits.forEach((habit) => {
+                        if (habit.type === 'checkbox' || habit.type === 'counter') {
+                          habit.completed = false;
+                          if (habit.type === 'counter') habit.count = 0;
+                          if (wasCompleted) {
+                            habit.streak = (habit.streak || 0) + 1;
+                            habit.bestStreak = Math.max(habit.bestStreak || 0, habit.streak);
+                          } else {
+                            habit.streak = 0;
+                          }
+                        } else if (habit.type === 'pomodoro') {
+                          habit.sessionsCompleted = 0;
+                          habit.completed = false;
+                          if (wasCompleted) {
+                            habit.streak = (habit.streak || 0) + 1;
+                            habit.bestStreak = Math.max(habit.bestStreak || 0, habit.streak);
+                          } else {
+                            habit.streak = 0;
+                          }
+                        }
+                      });
+
+                      updated[userName].pomodoro.sessionsToday = 0;
+                      updated[userName].pomodoro.dailyXP = 0;
+                      updated[userName].stats.completionPercentage = 0;
+                      saveToFirebase(userName, updated[userName]);
+                    }
+                  });
+                  setAllUsers(updated);
+                  setBonusTaskCompleted({});
+                  localStorage.setItem('lastResetDate', new Date().toISOString().split('T')[0]);
+                  showToast('✅ Daily reset forced!', 'success');
+                }
+              }}
+              style={{
+                padding: '10px 20px',
+                background: '#27ae60',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                fontFamily: 'inherit',
+              }}
+            >
+              Force Daily Reset Now
+            </button>
+          </div>
+
           {/* Reset All Data */}
           <div style={{ background: '#2a1a1a', padding: '20px', borderRadius: '12px', border: '2px solid #ff6b6b' }}>
             <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: '#ff6b6b' }}>⚠️ Danger Zone</div>
