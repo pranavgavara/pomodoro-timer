@@ -71,12 +71,14 @@ const PomodoroTimer = ({ user }) => {
   // Show browser notification
   const showBrowserNotification = (title, options = {}) => {
     if (notificationsEnabled && 'Notification' in window) {
-      new Notification(title, {
+      const notification = new Notification(title, {
         icon: '🏆',
         badge: '🎯',
         requireInteraction: false,
         ...options,
       });
+      // Auto-close notification after 5 seconds
+      setTimeout(() => notification.close(), 5000);
     }
   };
 
@@ -510,12 +512,19 @@ const PomodoroTimer = ({ user }) => {
       const wasCompleted = habit.completed;
       habit.completed = !habit.completed;
 
-      // Award XP when marking habit as complete (not when unchecking)
+      // Award XP when marking habit as complete
       if (!wasCompleted && habit.completed) {
         updated[currentUser].pomodoro.xp += 5;
         updated[currentUser].pomodoro.dailyXP += 5;
         updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
         showToast(`✅ ${habit.name} completed! +5 XP`, 'success');
+      }
+      // Remove XP when unchecking habit
+      else if (wasCompleted && !habit.completed) {
+        updated[currentUser].pomodoro.xp = Math.max(0, updated[currentUser].pomodoro.xp - 5);
+        updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - 5);
+        updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+        showToast(`↶ ${habit.name} unchecked! -5 XP`, 'info');
       }
 
       updateCompletionPercentage(updated);
@@ -535,12 +544,19 @@ const PomodoroTimer = ({ user }) => {
       habit.count = Math.max(0, habit.count + delta);
       habit.completed = habit.count >= (habit.goal || 8);
 
-      // Award XP when reaching goal for first time
+      // Award XP when reaching goal
       if (!wasCompleted && habit.completed) {
         updated[currentUser].pomodoro.xp += 5;
         updated[currentUser].pomodoro.dailyXP += 5;
         updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
         showToast(`✅ ${habit.name} goal reached! +5 XP`, 'success');
+      }
+      // Remove XP when going below goal
+      else if (wasCompleted && !habit.completed) {
+        updated[currentUser].pomodoro.xp = Math.max(0, updated[currentUser].pomodoro.xp - 5);
+        updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - 5);
+        updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+        showToast(`↶ ${habit.name} below goal! -5 XP`, 'info');
       }
 
       updateCompletionPercentage(updated);
@@ -695,6 +711,7 @@ const PomodoroTimer = ({ user }) => {
           { id: 'habits', label: '🎯 Habits' },
           { id: 'pomodoro', label: '⏱️ Pomodoro' },
           { id: 'leaderboard', label: '🏆 Leaderboard' },
+          ...(currentUser === 'GP47' ? [{ id: 'admin', label: '⚙️ Admin' }] : []),
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1249,19 +1266,24 @@ const PomodoroTimer = ({ user }) => {
                 };
                 return (
                   <div key={userName} style={{
-                    padding: '10px',
-                    marginBottom: '8px',
-                    background: '#0f0f1e',
+                    marginBottom: '12px',
                     borderRadius: '8px',
-                    borderLeft: `4px solid ${userColors[userName]}`,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
+                    overflow: 'hidden',
                   }}>
-                    <span style={{ fontWeight: 'bold', color: userColors[userName] }}>{userName}</span>
-                    <span style={{ fontSize: '12px', color: '#999' }}>
-                      {userData.stats.completionPercentage}% {isComplete ? '✅' : '⏳'}
-                    </span>
+                    <div style={{
+                      padding: '10px 12px',
+                      background: `linear-gradient(90deg, ${userColors[userName]}30 ${userData.stats.completionPercentage}%, #0f0f1e ${userData.stats.completionPercentage}%)`,
+                      borderRadius: '8px',
+                      borderLeft: `4px solid ${userColors[userName]}`,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}>
+                      <span style={{ fontWeight: 'bold', color: userColors[userName] }}>{userName}</span>
+                      <span style={{ fontSize: '12px', color: '#999' }}>
+                        {userData.stats.completionPercentage}% {isComplete ? '✅' : '⏳'}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
@@ -1319,6 +1341,86 @@ const PomodoroTimer = ({ user }) => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN TAB (GP47 only) */}
+      {activeTab === 'admin' && currentUser === 'GP47' && (
+        <div style={{ padding: '30px', maxWidth: '600px', margin: '0 auto' }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: accentColor }}>⚙️ Admin Panel</div>
+          <div style={{ fontSize: '13px', color: '#999', marginBottom: '30px' }}>Reset user stats and levels</div>
+
+          {/* Reset All Users */}
+          <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: accentColor }}>🔄 Reset User Levels</div>
+            {USERS.map((userName) => {
+              const userData = allUsers[userName] || createNewUserData();
+              return (
+                <div key={userName} style={{ padding: '15px', marginBottom: '10px', background: '#0f0f1e', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>{userName}</div>
+                    <div style={{ fontSize: '12px', color: '#999' }}>Level {userData.pomodoro.level} • {userData.pomodoro.xp} XP</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const updated = JSON.parse(JSON.stringify(allUsers));
+                      updated[userName].pomodoro.xp = 0;
+                      updated[userName].pomodoro.level = 1;
+                      updated[userName].pomodoro.dailyXP = 0;
+                      setAllUsers(updated);
+                      saveToFirebase(userName, updated[userName]);
+                      showToast(`✅ Reset ${userName}'s level to 1`, 'success');
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#ff6b6b',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Reset All Data */}
+          <div style={{ background: '#2a1a1a', padding: '20px', borderRadius: '12px', border: '2px solid #ff6b6b' }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: '#ff6b6b' }}>⚠️ Danger Zone</div>
+            <button
+              onClick={() => {
+                if (window.confirm('Reset ALL users XP and levels? This cannot be undone!')) {
+                  const updated = JSON.parse(JSON.stringify(allUsers));
+                  USERS.forEach((userName) => {
+                    updated[userName].pomodoro.xp = 0;
+                    updated[userName].pomodoro.level = 1;
+                    updated[userName].pomodoro.dailyXP = 0;
+                    saveToFirebase(userName, updated[userName]);
+                  });
+                  setAllUsers(updated);
+                  showToast('✅ Reset all users to Level 1', 'success');
+                }
+              }}
+              style={{
+                padding: '12px 24px',
+                background: '#ff6b6b',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontFamily: 'inherit',
+              }}
+            >
+              Reset All Users
+            </button>
           </div>
         </div>
       )}
