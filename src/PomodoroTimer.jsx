@@ -24,6 +24,7 @@ const PomodoroTimer = ({ user }) => {
   const [showCompletionAnimation, setShowCompletionAnimation] = useState(false);
   const [selectedHabitForPomodoro, setSelectedHabitForPomodoro] = useState(null);
   const [loading, setLoading] = useState(true);
+  const migrationDoneRef = useRef(false);
 
   const [toasts, setToasts] = useState([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -193,27 +194,33 @@ const PomodoroTimer = ({ user }) => {
       clearTimeout(loadTimeout);
       if (snapshot.exists()) {
         const data = snapshot.val();
-        // Migration: add missing habits to existing users
-        USERS.forEach((userName) => {
-          if (data[userName]) {
-            const existingHabitIds = new Set(data[userName].habits.map((h) => h.id));
-            DEFAULT_HABITS.forEach((defaultHabit) => {
-              if (!existingHabitIds.has(defaultHabit.id)) {
-                data[userName].habits.push({
-                  ...defaultHabit,
-                  completed: false,
-                  streak: 0,
-                  bestStreak: 0,
-                  count: 0,
-                  sessionsCompleted: 0,
-                });
-              }
-            });
+        // Migration: add missing habits to existing users (only once)
+        if (!migrationDoneRef.current) {
+          migrationDoneRef.current = true;
+          let needsSave = false;
+          USERS.forEach((userName) => {
+            if (data[userName]) {
+              const existingHabitIds = new Set(data[userName].habits.map((h) => h.id));
+              DEFAULT_HABITS.forEach((defaultHabit) => {
+                if (!existingHabitIds.has(defaultHabit.id)) {
+                  needsSave = true;
+                  data[userName].habits.push({
+                    ...defaultHabit,
+                    completed: false,
+                    streak: 0,
+                    bestStreak: 0,
+                    count: 0,
+                    sessionsCompleted: 0,
+                  });
+                }
+              });
+            }
+          });
+          if (needsSave) {
+            set(usersRef, data).catch((err) => console.error('Error saving migrated data:', err));
           }
-        });
+        }
         setAllUsers(data);
-        // Save migrated data back to Firebase
-        set(usersRef, data).catch((err) => console.error('Error saving migrated data:', err));
       } else {
         // Initialize if no data
         const newData = {};
