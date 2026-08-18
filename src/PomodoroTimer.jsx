@@ -16,22 +16,32 @@ const PomodoroTimer = ({ user }) => {
 
   // Will be set based on logged-in user
   const [currentUser, setCurrentUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('habits');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('activeTab') || 'habits';
+  });
   const [isWork, setIsWork] = useState(true);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [allUsers, setAllUsers] = useState({});
   const [showCompletionAnimation, setShowCompletionAnimation] = useState(false);
-  const [selectedHabitForPomodoro, setSelectedHabitForPomodoro] = useState(null);
+  const [selectedHabitForPomodoro, setSelectedHabitForPomodoro] = useState(() => {
+    const saved = localStorage.getItem('selectedHabit');
+    return saved ? parseInt(saved) : null;
+  });
   const [loading, setLoading] = useState(true);
   const migrationDoneRef = useRef(false);
 
   const [toasts, setToasts] = useState([]);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    const saved = localStorage.getItem('notificationsEnabled');
+    return saved ? JSON.parse(saved) : false;
+  });
   const prevDataRef = useRef({});
   const [timeUntilReset, setTimeUntilReset] = useState('');
   const [completionHistory, setCompletionHistory] = useState({});
-  const [calendarView, setCalendarView] = useState('week');
+  const [calendarView, setCalendarView] = useState(() => {
+    return localStorage.getItem('calendarView') || 'week';
+  });
 
   // Request browser notification permission
   const requestNotificationPermission = async () => {
@@ -173,6 +183,30 @@ const PomodoroTimer = ({ user }) => {
   useEffect(() => {
     setCurrentUser(userDisplayName);
   }, [userDisplayName]);
+
+  // Persist selected habit to localStorage
+  useEffect(() => {
+    if (selectedHabitForPomodoro) {
+      localStorage.setItem('selectedHabit', selectedHabitForPomodoro.toString());
+    } else {
+      localStorage.removeItem('selectedHabit');
+    }
+  }, [selectedHabitForPomodoro]);
+
+  // Persist active tab to localStorage
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
+
+  // Persist notifications enabled to localStorage
+  useEffect(() => {
+    localStorage.setItem('notificationsEnabled', JSON.stringify(notificationsEnabled));
+  }, [notificationsEnabled]);
+
+  // Persist calendar view to localStorage
+  useEffect(() => {
+    localStorage.setItem('calendarView', calendarView);
+  }, [calendarView]);
 
 
   // Load data from Firebase
@@ -347,6 +381,9 @@ const PomodoroTimer = ({ user }) => {
 
         setAllUsers(updated);
         localStorage.setItem('lastResetDate', today);
+        // Clear daily selections but keep permanent preferences
+        localStorage.removeItem('selectedHabit');
+        setSelectedHabitForPomodoro(null);
         showToast('📅 Daily reset! New habits unlocked for today', 'success');
       }
     };
