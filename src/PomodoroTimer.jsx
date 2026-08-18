@@ -383,37 +383,31 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const toggleHabit = (habitId) => {
-    if (!currentUser) return; // Safety check
+    if (!currentUser) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return; // Ensure user exists
-    
+    if (!updated[currentUser]) return;
+
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'checkbox') {
       habit.completed = !habit.completed;
-      
-      // Update only current user
-      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, userDataToSave);
+      saveToFirebase(currentUser, updated[currentUser]);
     }
   };
 
   const updateWaterCount = (habitId, delta) => {
-    if (!currentUser) return; // Safety check
+    if (!currentUser) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return; // Ensure user exists
+    if (!updated[currentUser]) return;
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'counter') {
       habit.count = Math.max(0, habit.count + delta);
       habit.completed = habit.count >= (habit.goal || 8);
-
-      // Update only current user
-      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, userDataToSave);
+      saveToFirebase(currentUser, updated[currentUser]);
     }
   };
 
@@ -438,10 +432,9 @@ const PomodoroTimer = ({ user }) => {
       updated[currentUser].pomodoro.dailyXP += xpGain;
       updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
 
-      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, userDataToSave);
+      saveToFirebase(currentUser, updated[currentUser]);
 
       playSound();
       showToast(`✅ ${habit.name} session added! +${xpGain} XP`, 'success');
@@ -469,10 +462,9 @@ const PomodoroTimer = ({ user }) => {
       updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - xpGain);
       updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
 
-      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, userDataToSave);
+      saveToFirebase(currentUser, updated[currentUser]);
 
       showToast(`↶ ${habit.name} session removed! -${xpGain} XP`, 'info');
     }
@@ -655,23 +647,25 @@ const PomodoroTimer = ({ user }) => {
                   <span style={{ minWidth: '30px', textAlign: 'center', fontSize: '12px' }}>
                     {habit.sessionsCompleted}/{habit.sessionsRequired}
                   </span>
-                  <button
-                    onClick={() => addPomodoroSession(habit.id)}
-                    style={{
-                      padding: '6px 12px',
-                      background: habit.completed ? '#0f0f1e' : 'transparent',
-                      color: habit.completed ? accentColor : accentColor,
-                      border: `2px solid ${habit.completed ? '#0f0f1e' : accentColor}`,
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '12px',
-                      fontFamily: 'inherit',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    ✓ Add
-                  </button>
+                  {habit.sessionsCompleted < habit.sessionsRequired && (
+                    <button
+                      onClick={() => addPomodoroSession(habit.id)}
+                      style={{
+                        padding: '6px 12px',
+                        background: 'transparent',
+                        color: accentColor,
+                        border: `2px solid ${accentColor}`,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        fontFamily: 'inherit',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      ✓ Add
+                    </button>
+                  )}
                   {habit.sessionsCompleted > 0 && (
                     <button
                       onClick={() => removePomodoroSession(habit.id)}
@@ -767,7 +761,7 @@ const PomodoroTimer = ({ user }) => {
                     Completion: {otherData.stats.completionPercentage}% ({otherCompleted}/{otherData.habits.length}) | Level: {otherData.pomodoro.level}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {otherData.habits.slice(0, 4).map((habit) => (
+                    {otherData.habits.map((habit) => (
                       <div key={habit.id} style={{
                         padding: '6px 12px',
                         background: habit.completed ? accentColor : '#0f0f1e',
@@ -924,6 +918,17 @@ const PomodoroTimer = ({ user }) => {
         <div style={{ padding: '30px', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: accentColor }}>🏆 Leaderboard</div>
           <div style={{ fontSize: '13px', color: '#999', marginBottom: '30px', textTransform: 'uppercase', letterSpacing: '1px' }}>Real-Time Rankings & Completion Tracking</div>
+
+          {/* XP Rules Legend */}
+          <div style={{ marginBottom: '30px', background: '#1a1a2e', padding: '15px', borderRadius: '12px', border: `2px solid #7FFF00` }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px', color: '#7FFF00' }}>⚡ How to Gain XP</div>
+            <div style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.6' }}>
+              <div style={{ marginBottom: '8px' }}>✓ <strong>Base XP:</strong> +10 XP per session (timer or manual)</div>
+              <div style={{ marginBottom: '8px' }}>🔥 <strong>Bonus XP:</strong> +10 extra XP for first 3 sessions of the day (total +20)</div>
+              <div style={{ marginBottom: '8px' }}>📈 <strong>Leveling:</strong> 100 XP = 1 Level</div>
+              <div>💪 <strong>Daily Goal:</strong> Complete 70%+ of habits to hit daily completion target</div>
+            </div>
+          </div>
 
           {/* Enhanced Calendar with History */}
           <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
