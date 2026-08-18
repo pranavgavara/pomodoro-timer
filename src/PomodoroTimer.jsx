@@ -341,10 +341,8 @@ const PomodoroTimer = ({ user }) => {
 
     const unsubscribeBonus = onValue(bonusRef, (snapshot) => {
       if (snapshot.exists()) {
-        console.log('Bonus task updated from Firebase:', snapshot.val());
         setBonusTaskCompleted(snapshot.val());
       } else {
-        console.log('No bonus task data in Firebase');
         setBonusTaskCompleted({});
       }
     }, (error) => {
@@ -666,10 +664,7 @@ const PomodoroTimer = ({ user }) => {
     const today = new Date().toISOString().split('T')[0];
 
     // Check if already completed
-    if (bonusTaskCompleted[today]) {
-      console.log('Bonus already completed:', bonusTaskCompleted[today]);
-      return;
-    }
+    if (bonusTaskCompleted[today]) return;
 
     const updated = JSON.parse(JSON.stringify(allUsers));
 
@@ -685,12 +680,10 @@ const PomodoroTimer = ({ user }) => {
     // Save bonus task completion - immediately update local state
     const bonusData = { completedBy: currentUser, timestamp: new Date().toISOString() };
     const bonusRef = ref(database, `bonusTask/${today}`);
-    set(bonusRef, bonusData).then(() => {
-      console.log('Bonus task saved to Firebase:', { [today]: bonusData });
-      setBonusTaskCompleted({ ...bonusTaskCompleted, [today]: bonusData });
-    }).catch((err) => {
+    set(bonusRef, bonusData).catch((err) => {
       console.error('Error saving bonus task:', err);
     });
+    setBonusTaskCompleted({ ...bonusTaskCompleted, [today]: bonusData });
 
     showToast(`🐕 ${currentUser} walked Mylo! +20 XP bonus`, 'success');
     playSound();
