@@ -767,7 +767,7 @@ const PomodoroTimer = ({ user }) => {
                     Completion: {otherData.stats.completionPercentage}% ({otherCompleted}/{otherData.habits.length}) | Level: {otherData.pomodoro.level}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {otherData.habits.slice(0, 4).map((habit) => (
+                    {otherData.habits.map((habit) => (
                       <div key={habit.id} style={{
                         padding: '6px 12px',
                         background: habit.completed ? accentColor : '#0f0f1e',
