@@ -72,14 +72,23 @@ const PomodoroTimer = ({ user }) => {
   // Show browser notification
   const showBrowserNotification = (title, options = {}) => {
     if (notificationsEnabled && 'Notification' in window) {
-      const notification = new Notification(title, {
-        icon: '🏆',
-        badge: '🎯',
-        requireInteraction: false,
-        ...options,
-      });
-      // Auto-close notification after 5 seconds
-      setTimeout(() => notification.close(), 5000);
+      try {
+        const notification = new Notification(title, {
+          icon: '🏆',
+          badge: '🎯',
+          requireInteraction: false,
+          tag: 'habit-notification',
+          ...options,
+        });
+        // Auto-close notification after 3 seconds
+        setTimeout(() => {
+          if (notification && notification.close) {
+            notification.close();
+          }
+        }, 3000);
+      } catch (err) {
+        console.error('Notification error:', err);
+      }
     }
   };
 
