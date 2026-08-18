@@ -652,9 +652,13 @@ const PomodoroTimer = ({ user }) => {
     }
   };
 
-  const updateCompletionPercentage = (users) => {
-    const completed = users[currentUser].habits.filter((h) => h.completed).length;
-    users[currentUser].stats.completionPercentage = Math.round((completed / users[currentUser].habits.length) * 100);
+  const updateCompletionPercentage = (users, bonusData = bonusTaskCompleted) => {
+    const today = new Date().toISOString().split('T')[0];
+    const habitCompleted = users[currentUser].habits.filter((h) => h.completed).length;
+    const myloCompleted = bonusData[today] ? 1 : 0;
+    const totalCompleted = habitCompleted + myloCompleted;
+    const totalItems = users[currentUser].habits.length + 1; // 7 habits + 1 Mylo
+    users[currentUser].stats.completionPercentage = Math.round((totalCompleted / totalItems) * 100);
   };
 
   const completeBonusTask = () => {
@@ -832,7 +836,13 @@ const PomodoroTimer = ({ user }) => {
             {currentUser}'s Daily Habits
           </div>
           <div style={{ fontSize: '14px', color: '#999', marginBottom: '30px' }}>
-            Completion: {userData.stats.completionPercentage}% ({completedHabits}/{userData.habits.length})
+            {(() => {
+              const today = new Date().toISOString().split('T')[0];
+              const myloCompleted = bonusTaskCompleted[today] ? 1 : 0;
+              const totalCount = completedHabits + myloCompleted;
+              const totalItems = userData.habits.length + 1;
+              return `Completion: ${userData.stats.completionPercentage}% (${totalCount}/${totalItems})`;
+            })()}
           </div>
 
           {userData.habits.map((habit) => (
@@ -1237,7 +1247,9 @@ const PomodoroTimer = ({ user }) => {
             <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px', color: '#7FFF00' }}>⚡ How to Gain XP</div>
             <div style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.6' }}>
               <div style={{ marginBottom: '8px' }}>✓ <strong>Base XP:</strong> +10 XP per session (timer or manual)</div>
-              <div style={{ marginBottom: '8px' }}>🔥 <strong>Bonus XP:</strong> +10 extra XP for first 3 sessions of the day (total +20)</div>
+              <div style={{ marginBottom: '8px' }}>🔥 <strong>Session Bonus:</strong> +10 extra XP for first 3 sessions of the day (total +20)</div>
+              <div style={{ marginBottom: '8px' }}>✅ <strong>Habit Completion:</strong> +5 XP per checkbox/counter habit completed</div>
+              <div style={{ marginBottom: '8px' }}>🐕 <strong>Daily Bonus (Mylo):</strong> +20 XP once per day (first to claim)</div>
               <div style={{ marginBottom: '8px' }}>📈 <strong>Leveling:</strong> 100 XP = 1 Level</div>
               <div>💪 <strong>Daily Goal:</strong> Complete 70%+ of habits to hit daily completion target</div>
             </div>
