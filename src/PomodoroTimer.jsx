@@ -12,7 +12,8 @@ const PomodoroTimer = ({ user }) => {
     { id: 5, name: 'Water Intake', category: '💧', type: 'counter', goal: 8 },
   ];
 
-  const [currentUser, setCurrentUser] = useState('GP47');
+  // Will be set based on logged-in user
+  const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('habits');
   const [isWork, setIsWork] = useState(true);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -25,6 +26,9 @@ const PomodoroTimer = ({ user }) => {
   const [toasts, setToasts] = useState([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const prevDataRef = useRef({});
+  const [timeUntilReset, setTimeUntilReset] = useState('');
+  const [completionHistory, setCompletionHistory] = useState({});
+  const [calendarView, setCalendarView] = useState('week');
 
   // Request browser notification permission
   const requestNotificationPermission = async () => {
@@ -127,6 +131,27 @@ const PomodoroTimer = ({ user }) => {
       prevDataRef.current[userName] = JSON.parse(JSON.stringify(userData));
     });
   }, [allUsers, currentUser, notificationsEnabled]);
+  // Calculate time until daily reset (midnight)
+  useEffect(() => {
+    const updateResetTimer = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      
+      const timeLeft = tomorrow - now;
+      const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+      const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+      
+      setTimeUntilReset(`${hours}h ${minutes}m ${seconds}s`);
+    };
+    
+    updateResetTimer();
+    const interval = setInterval(updateResetTimer, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
 
 
   const intervalRef = useRef(null);
@@ -141,6 +166,11 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const userDisplayName = getUserName(user.email);
+  // Set current user to logged-in user
+  useEffect(() => {
+    setCurrentUser(userDisplayName);
+  }, [userDisplayName]);
+
 
   // Load data from Firebase
   useEffect(() => {
@@ -191,6 +221,37 @@ const PomodoroTimer = ({ user }) => {
       unsubscribe();
     };
   }, []);
+  // Save completion history when day changes
+  const saveDailyCompletion = async () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateStr = yesterday.toISOString().split('T')[0];
+    
+    // Save each user's completion status for yesterday
+    Object.keys(allUsers).forEach((userName) => {
+      const userData = allUsers[userName];
+      const historyRef = ref(database, `history/${dateStr}/${userName}`);
+      set(historyRef, {
+        completed: userData.stats.completionPercentage >= 70,
+        percentage: userData.stats.completionPercentage,
+        timestamp: yesterday.toISOString(),
+      }).catch((err) => console.error('Error saving history:', err));
+    });
+  };
+
+  // Load completion history from Firebase
+  useEffect(() => {
+    // Load last 60 days of history
+    const history = {};
+    const historyRef = ref(database, 'history');
+    
+    onValue(historyRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setCompletionHistory(snapshot.val());
+      }
+    }).catch((err) => console.error('Error loading history:', err));
+  }, []);
+
 
   const createNewUserData = () => ({
     habits: DEFAULT_HABITS.map((h) => ({
@@ -297,25 +358,37 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const toggleHabit = (habitId) => {
+    if (!currentUser) return; // Safety check
     const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) return; // Ensure user exists
+    
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'checkbox') {
       habit.completed = !habit.completed;
+      
+      // Update only current user
+      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, updated[currentUser]);
+      saveToFirebase(currentUser, userDataToSave);
     }
   };
 
   const updateWaterCount = (habitId, delta) => {
+    if (!currentUser) return; // Safety check
     const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) return; // Ensure user exists
+    
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'counter') {
       habit.count = Math.max(0, habit.count + delta);
       habit.completed = habit.count >= (habit.goal || 8);
+      
+      // Update only current user
+      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, updated[currentUser]);
+      saveToFirebase(currentUser, userDataToSave);
     }
   };
 
@@ -728,7 +801,207 @@ const PomodoroTimer = ({ user }) => {
       {activeTab === 'leaderboard' && (
         <div style={{ padding: '30px', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: accentColor }}>🏆 Leaderboard</div>
-          <div style={{ fontSize: '13px', color: '#999', marginBottom: '30px', textTransform: 'uppercase', letterSpacing: '1px' }}>Real-Time Rankings</div>
+          <div style={{ fontSize: '13px', color: '#999', marginBottom: '30px', textTransform: 'uppercase', letterSpacing: '1px' }}>Real-Time Rankings & Completion Tracking</div>
+
+          {/* Enhanced Calendar with History */}
+          <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: accentColor }}>📅 Completion Calendar</div>
+
+            {/* View Toggle */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <button
+                onClick={() => setCalendarView('week')}
+                style={{
+                  padding: '8px 16px',
+                  background: calendarView === 'week' ? accentColor : '#0f0f1e',
+                  color: calendarView === 'week' ? '#0f0f1e' : accentColor,
+                  border: `2px solid ${accentColor}`,
+                  borderRadius: '6px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: '12px',
+                }}
+              >
+                This Week
+              </button>
+              <button
+                onClick={() => setCalendarView('month')}
+                style={{
+                  padding: '8px 16px',
+                  background: calendarView === 'month' ? accentColor : '#0f0f1e',
+                  color: calendarView === 'month' ? '#0f0f1e' : accentColor,
+                  border: `2px solid ${accentColor}`,
+                  borderRadius: '6px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: '12px',
+                }}
+              >
+                Last 30 Days
+              </button>
+            </div>
+
+            {/* Color Legend */}
+            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', marginBottom: '20px', fontSize: '12px' }}>
+              {[
+                { name: 'GP47', color: '#FF6B9D' },
+                { name: 'Pri', color: '#00D9FF' },
+                { name: 'Nikki', color: '#FFAA00' },
+                { name: 'Sid', color: '#7FFF00' },
+              ].map((user) => (
+                <div key={user.name} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: user.color }} />
+                  <span>{user.name}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar Grid */}
+            <div style={{ background: '#0f0f1e', padding: '15px', borderRadius: '8px', overflowX: 'auto' }}>
+              {calendarView === 'week' && (
+                <div>
+                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '10px', textTransform: 'uppercase' }}>This Week</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, idx) => {
+                      const date = new Date();
+                      date.setDate(date.getDate() - (date.getDay() - idx - 1 + 7) % 7);
+                      const dateStr = date.toISOString().split('T')[0];
+                      const dayHistory = completionHistory[dateStr] || {};
+
+                      const userColors = {
+                        'GP47': '#FF6B9D',
+                        'Pri': '#00D9FF',
+                        'Nikki': '#FFAA00',
+                        'Sid': '#7FFF00',
+                      };
+
+                      return (
+                        <div key={day} style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '11px', color: '#999', marginBottom: '5px', fontWeight: 'bold' }}>{day}</div>
+                          <div style={{
+                            width: '100%',
+                            aspectRatio: '1',
+                            background: '#1a1a2e',
+                            borderRadius: '8px',
+                            border: `1px solid #333`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexWrap: 'wrap',
+                            padding: '4px',
+                            gap: '2px',
+                          }}>
+                            {Object.keys(dayHistory).length > 0 ? (
+                              Object.keys(dayHistory).map((userName) => (
+                                dayHistory[userName].completed && (
+                                  <div key={userName} style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '2px',
+                                    background: userColors[userName],
+                                  }} />
+                                )
+                              ))
+                            ) : (
+                              <span style={{ fontSize: '10px', color: '#666' }}>—</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {calendarView === 'month' && (
+                <div>
+                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '10px', textTransform: 'uppercase' }}>Last 30 Days</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))', gap: '4px' }}>
+                    {Array.from({ length: 30 }).map((_, i) => {
+                      const date = new Date();
+                      date.setDate(date.getDate() - (29 - i));
+                      const dateStr = date.toISOString().split('T')[0];
+                      const dayHistory = completionHistory[dateStr] || {};
+
+                      const userColors = {
+                        'GP47': '#FF6B9D',
+                        'Pri': '#00D9FF',
+                        'Nikki': '#FFAA00',
+                        'Sid': '#7FFF00',
+                      };
+
+                      const completedCount = Object.keys(dayHistory).filter((u) => dayHistory[u].completed).length;
+
+                      return (
+                        <div key={dateStr} style={{
+                          aspectRatio: '1',
+                          background: completedCount === 4 ? '#2d5f2e' : completedCount >= 2 ? '#3a3a5f' : '#1a1a2e',
+                          borderRadius: '4px',
+                          border: `1px solid #333`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexWrap: 'wrap',
+                          padding: '2px',
+                          gap: '1px',
+                          title: `${dateStr}: ${completedCount} users completed`,
+                        }}>
+                          {completedCount > 0 ? (
+                            Object.keys(dayHistory).map((userName) => (
+                              dayHistory[userName].completed && (
+                                <div key={userName} style={{
+                                  width: '6px',
+                                  height: '6px',
+                                  borderRadius: '1px',
+                                  background: userColors[userName],
+                                }} />
+                              )
+                            ))
+                          ) : (
+                            <span style={{ fontSize: '8px', color: '#666' }}>·</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Today's Status */}
+            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: `1px solid #333` }}>
+              <div style={{ fontSize: '13px', color: '#999', marginBottom: '10px', textTransform: 'uppercase' }}>Today's Progress</div>
+              {USERS.map((userName) => {
+                const userData = allUsers[userName] || createNewUserData();
+                const isComplete = userData.stats.completionPercentage >= 70;
+                const userColors = {
+                  'GP47': '#FF6B9D',
+                  'Pri': '#00D9FF',
+                  'Nikki': '#FFAA00',
+                  'Sid': '#7FFF00',
+                };
+                return (
+                  <div key={userName} style={{
+                    padding: '10px',
+                    marginBottom: '8px',
+                    background: '#0f0f1e',
+                    borderRadius: '8px',
+                    borderLeft: `4px solid ${userColors[userName]}`,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}>
+                    <span style={{ fontWeight: 'bold', color: userColors[userName] }}>{userName}</span>
+                    <span style={{ fontSize: '12px', color: '#999' }}>
+                      {userData.stats.completionPercentage}% {isComplete ? '✅' : '⏳'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Longest Streaks */}
           <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
@@ -741,23 +1014,6 @@ const PomodoroTimer = ({ user }) => {
                   <span style={{ fontWeight: 'bold' }}>{userName}</span>
                   <span style={{ fontSize: '12px', color: '#999' }}>
                     {longestHabit.name} • <span style={{ color: accentColor, fontWeight: 'bold' }}>{longestHabit.streak} days 🔥</span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Weekly Wins */}
-          <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
-            <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: accentColor }}>📊 Today's Performance</div>
-            {USERS.map((userName) => {
-              const userData = allUsers[userName] || createNewUserData();
-              return (
-                <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#0f0f1e', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 'bold' }}>{userName}</span>
-                  <span style={{ fontSize: '12px' }}>
-                    <span style={{ color: accentColor, fontWeight: 'bold' }}>{userData.stats.completionPercentage}%</span> completion
-                    {userData.stats.completionPercentage >= 70 && <span style={{ marginLeft: '8px', color: accentColor }}>✅ Daily Goal!</span>}
                   </span>
                 </div>
               );
@@ -795,74 +1051,6 @@ const PomodoroTimer = ({ user }) => {
                 <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#0f0f1e', borderRadius: '8px' }}>
                   <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>{userName}</div>
                   <div style={{ fontSize: '12px', color: '#999' }}>💎 {totalSessions} total sessions | 🎯 {userData.pomodoro.dailyXP} XP today</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'leaderboard' && (
-        <div style={{ padding: '30px', maxWidth: '800px', margin: '0 auto' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '30px' }}>🏆 Real-Time Leaderboard</div>
-
-          <div style={{ marginBottom: '40px' }}>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>📊 Total Sessions</div>
-            {USERS.map((userName, idx) => {
-              const userSessions = allUsers[userName]?.pomodoro.sessions || 0;
-              return (
-                <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#1a1a2e', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${accentColor}` }}>
-                  <span style={{ fontWeight: 'bold' }}>#{idx + 1} {userName}</span>
-                  <span>{userSessions} sessions</span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ marginBottom: '40px' }}>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>⭐ Total XP</div>
-            {USERS.map((userName, idx) => {
-              const userXP = allUsers[userName]?.pomodoro.xp || 0;
-              return (
-                <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#1a1a2e', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${accentColor}` }}>
-                  <span style={{ fontWeight: 'bold' }}>#{idx + 1} {userName}</span>
-                  <span>{userXP} XP (Level {Math.floor(userXP / 100) + 1})</span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ marginBottom: '40px' }}>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>💪 Exercise Progress</div>
-            {USERS.map((userName) => {
-              const exerciseHabit = allUsers[userName]?.habits.find((h) => h.id === 1);
-              return (
-                <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#1a1a2e', borderRadius: '8px', border: `1px solid ${accentColor}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                    <span style={{ fontWeight: 'bold' }}>{userName}</span>
-                    <span style={{ fontSize: '12px' }}>{exerciseHabit?.sessionsCompleted || 0}/{exerciseHabit?.sessionsRequired || 2}</span>
-                  </div>
-                  <div style={{ width: '100%', height: '6px', background: '#333', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ width: `${((exerciseHabit?.sessionsCompleted || 0) / (exerciseHabit?.sessionsRequired || 2)) * 100}%`, height: '100%', background: accentColor }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>🤖 AI Reading Progress</div>
-            {USERS.map((userName) => {
-              const aiReadingHabit = allUsers[userName]?.habits.find((h) => h.id === 2);
-              return (
-                <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#1a1a2e', borderRadius: '8px', border: `1px solid ${accentColor}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                    <span style={{ fontWeight: 'bold' }}>{userName}</span>
-                    <span style={{ fontSize: '12px' }}>{aiReadingHabit?.sessionsCompleted || 0}/{aiReadingHabit?.sessionsRequired || 1}</span>
-                  </div>
-                  <div style={{ width: '100%', height: '6px', background: '#333', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ width: `${((aiReadingHabit?.sessionsCompleted || 0) / (aiReadingHabit?.sessionsRequired || 1)) * 100}%`, height: '100%', background: accentColor }} />
-                  </div>
                 </div>
               );
             })}
