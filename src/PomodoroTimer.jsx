@@ -10,6 +10,8 @@ const PomodoroTimer = ({ user }) => {
     { id: 3, name: 'Sleep 8hrs', category: '😴', type: 'checkbox' },
     { id: 4, name: 'Brush Twice Daily', category: '🪥', type: 'checkbox' },
     { id: 5, name: 'Water Intake', category: '💧', type: 'counter', goal: 8 },
+    { id: 6, name: 'Take Vitamins', category: '💊', type: 'checkbox' },
+    { id: 7, name: 'Eat 2 Eggs', category: '🥚', type: 'checkbox' },
   ];
 
   // Will be set based on logged-in user
@@ -380,17 +382,48 @@ const PomodoroTimer = ({ user }) => {
     if (!currentUser) return; // Safety check
     const updated = JSON.parse(JSON.stringify(allUsers));
     if (!updated[currentUser]) return; // Ensure user exists
-    
+
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'counter') {
       habit.count = Math.max(0, habit.count + delta);
       habit.completed = habit.count >= (habit.goal || 8);
-      
+
       // Update only current user
       const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
       saveToFirebase(currentUser, userDataToSave);
+    }
+  };
+
+  const addPomodoroSession = (habitId) => {
+    if (!currentUser) return;
+    const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) return;
+
+    const habit = updated[currentUser].habits.find((h) => h.id === habitId);
+    if (habit && habit.type === 'pomodoro') {
+      habit.sessionsCompleted = (habit.sessionsCompleted || 0) + 1;
+      if (habit.sessionsCompleted >= habit.sessionsRequired) {
+        habit.completed = true;
+      }
+
+      updated[currentUser].pomodoro.sessions += 1;
+      updated[currentUser].pomodoro.sessionsToday += 1;
+
+      const bonus = updated[currentUser].pomodoro.sessionsToday <= 3 ? 10 : 0;
+      const xpGain = 10 + bonus;
+      updated[currentUser].pomodoro.xp += xpGain;
+      updated[currentUser].pomodoro.dailyXP += xpGain;
+      updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+
+      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
+      updateCompletionPercentage(updated);
+      setAllUsers(updated);
+      saveToFirebase(currentUser, userDataToSave);
+
+      playSound();
+      showToast(`✅ ${habit.name} session added! +${xpGain} XP`, 'success');
     }
   };
 
@@ -571,6 +604,23 @@ const PomodoroTimer = ({ user }) => {
                   <span style={{ minWidth: '30px', textAlign: 'center', fontSize: '12px' }}>
                     {habit.sessionsCompleted}/{habit.sessionsRequired}
                   </span>
+                  <button
+                    onClick={() => addPomodoroSession(habit.id)}
+                    style={{
+                      padding: '6px 12px',
+                      background: habit.completed ? '#0f0f1e' : 'transparent',
+                      color: habit.completed ? accentColor : accentColor,
+                      border: `2px solid ${habit.completed ? '#0f0f1e' : accentColor}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      fontFamily: 'inherit',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ✓ Done
+                  </button>
                 </div>
               )}
 
