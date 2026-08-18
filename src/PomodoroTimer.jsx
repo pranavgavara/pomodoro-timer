@@ -600,7 +600,84 @@ const PomodoroTimer = ({ user }) => {
         </div>
       )}
 
-      {/* LEADERBOARD TAB */}
+            {/* LEADERBOARD TAB */}
+      {activeTab === 'leaderboard' && (
+        <div style={{ padding: '30px', maxWidth: '900px', margin: '0 auto' }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: accentColor }}>🏆 Leaderboard</div>
+          <div style={{ fontSize: '13px', color: '#999', marginBottom: '30px', textTransform: 'uppercase', letterSpacing: '1px' }}>Real-Time Rankings</div>
+
+          {/* Longest Streaks */}
+          <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: accentColor }}>🔥 Longest Active Streaks</div>
+            {USERS.map((userName) => {
+              const userHabits = allUsers[userName]?.habits || [];
+              const longestHabit = userHabits.reduce((max, h) => (h.streak > max.streak ? h : max), { streak: 0, name: 'None' });
+              return (
+                <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#0f0f1e', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 'bold' }}>{userName}</span>
+                  <span style={{ fontSize: '12px', color: '#999' }}>
+                    {longestHabit.name} • <span style={{ color: accentColor, fontWeight: 'bold' }}>{longestHabit.streak} days 🔥</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Weekly Wins */}
+          <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: accentColor }}>📊 Today's Performance</div>
+            {USERS.map((userName) => {
+              const userData = allUsers[userName] || createNewUserData();
+              return (
+                <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#0f0f1e', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 'bold' }}>{userName}</span>
+                  <span style={{ fontSize: '12px' }}>
+                    <span style={{ color: accentColor, fontWeight: 'bold' }}>{userData.stats.completionPercentage}%</span> completion
+                    {userData.stats.completionPercentage >= 70 && <span style={{ marginLeft: '8px', color: accentColor }}>✅ Daily Goal!</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Overall Level */}
+          <div style={{ marginBottom: '40px', background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: accentColor }}>⭐ Overall Level</div>
+            {USERS.sort((a, b) => (allUsers[b]?.pomodoro.level || 1) - (allUsers[a]?.pomodoro.level || 1)).map((userName, idx) => {
+              const userLevel = allUsers[userName]?.pomodoro.level || 1;
+              const userXP = allUsers[userName]?.pomodoro.xp || 0;
+              const medals = ['🥇', '🥈', '🥉'];
+              return (
+                <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#0f0f1e', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span>{medals[idx] || '4️⃣'}</span>
+                    <span style={{ fontWeight: 'bold' }}>{userName}</span>
+                  </div>
+                  <span style={{ fontSize: '12px', color: '#999' }}>
+                    Level <span style={{ color: accentColor, fontWeight: 'bold', fontSize: '14px' }}>{userLevel}</span> • {userXP} XP
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Achievements */}
+          <div style={{ background: '#1a1a2e', padding: '20px', borderRadius: '12px', border: `2px solid ${accentColor}` }}>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', color: accentColor }}>🏅 Stats</div>
+            {USERS.map((userName) => {
+              const userData = allUsers[userName] || createNewUserData();
+              const totalSessions = userData.pomodoro.sessions || 0;
+              return (
+                <div key={userName} style={{ padding: '12px', marginBottom: '8px', background: '#0f0f1e', borderRadius: '8px' }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>{userName}</div>
+                  <div style={{ fontSize: '12px', color: '#999' }}>💎 {totalSessions} total sessions | 🎯 {userData.pomodoro.dailyXP} XP today</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'leaderboard' && (
         <div style={{ padding: '30px', maxWidth: '800px', margin: '0 auto' }}>
           <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '30px' }}>🏆 Real-Time Leaderboard</div>
