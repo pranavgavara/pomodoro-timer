@@ -336,7 +336,8 @@ const PomodoroTimer = ({ user }) => {
       const lastResetDate = localStorage.getItem('lastResetDate');
       const today = new Date().toISOString().split('T')[0];
 
-      if (lastResetDate !== today) {
+      // Only reset if lastResetDate was previously set AND it's a different day
+      if (lastResetDate && lastResetDate !== today) {
         console.log('Performing daily reset...');
         saveDailyCompletion();
 
@@ -380,12 +381,13 @@ const PomodoroTimer = ({ user }) => {
         });
 
         setAllUsers(updated);
-        localStorage.setItem('lastResetDate', today);
         // Clear daily selections but keep permanent preferences
         localStorage.removeItem('selectedHabit');
         setSelectedHabitForPomodoro(null);
         showToast('📅 Daily reset! New habits unlocked for today', 'success');
       }
+      // Always set lastResetDate to today (on first load or after reset)
+      localStorage.setItem('lastResetDate', today);
     };
 
     checkAndReset();
