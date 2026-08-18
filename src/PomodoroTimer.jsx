@@ -22,7 +22,10 @@ const PomodoroTimer = ({ user }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [allUsers, setAllUsers] = useState({});
   const [showCompletionAnimation, setShowCompletionAnimation] = useState(false);
-  const [selectedHabitForPomodoro, setSelectedHabitForPomodoro] = useState(null);
+  const [selectedHabitForPomodoro, setSelectedHabitForPomodoro] = useState(() => {
+    const saved = localStorage.getItem('selectedHabit');
+    return saved ? parseInt(saved) : null;
+  });
   const [loading, setLoading] = useState(true);
   const migrationDoneRef = useRef(false);
 
@@ -173,6 +176,15 @@ const PomodoroTimer = ({ user }) => {
   useEffect(() => {
     setCurrentUser(userDisplayName);
   }, [userDisplayName]);
+
+  // Persist selected habit to localStorage
+  useEffect(() => {
+    if (selectedHabitForPomodoro) {
+      localStorage.setItem('selectedHabit', selectedHabitForPomodoro.toString());
+    } else {
+      localStorage.removeItem('selectedHabit');
+    }
+  }, [selectedHabitForPomodoro]);
 
 
   // Load data from Firebase
