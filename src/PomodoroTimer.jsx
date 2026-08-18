@@ -294,6 +294,68 @@ const PomodoroTimer = ({ user }) => {
     return () => unsubscribe();
   }, []);
 
+  // Daily reset at midnight
+  useEffect(() => {
+    if (!currentUser || Object.keys(allUsers).length === 0) return;
+
+    const checkAndReset = () => {
+      const lastResetDate = localStorage.getItem('lastResetDate');
+      const today = new Date().toISOString().split('T')[0];
+
+      if (lastResetDate !== today) {
+        console.log('Performing daily reset...');
+        saveDailyCompletion();
+
+        const updated = JSON.parse(JSON.stringify(allUsers));
+        USERS.forEach((userName) => {
+          if (updated[userName]) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            const yesterdayData = completionHistory[yesterdayStr];
+            const wasCompleted = yesterdayData?.[userName]?.completed || false;
+
+            updated[userName].habits.forEach((habit) => {
+              if (habit.type === 'checkbox' || habit.type === 'counter') {
+                habit.completed = false;
+                if (habit.type === 'counter') habit.count = 0;
+                if (wasCompleted) {
+                  habit.streak = (habit.streak || 0) + 1;
+                  habit.bestStreak = Math.max(habit.bestStreak || 0, habit.streak);
+                } else {
+                  habit.streak = 0;
+                }
+              } else if (habit.type === 'pomodoro') {
+                habit.sessionsCompleted = 0;
+                habit.completed = false;
+                if (wasCompleted) {
+                  habit.streak = (habit.streak || 0) + 1;
+                  habit.bestStreak = Math.max(habit.bestStreak || 0, habit.streak);
+                } else {
+                  habit.streak = 0;
+                }
+              }
+            });
+
+            updated[userName].pomodoro.sessionsToday = 0;
+            updated[userName].pomodoro.dailyXP = 0;
+            updated[userName].stats.completionPercentage = 0;
+
+            saveToFirebase(userName, updated[userName]);
+          }
+        });
+
+        setAllUsers(updated);
+        localStorage.setItem('lastResetDate', today);
+        showToast('📅 Daily reset! New habits unlocked for today', 'success');
+      }
+    };
+
+    checkAndReset();
+    const interval = setInterval(checkAndReset, 60000);
+    return () => clearInterval(interval);
+  }, [currentUser, allUsers, completionHistory]);
+
 
   const createNewUserData = () => ({
     habits: DEFAULT_HABITS.map((h) => ({
@@ -406,7 +468,17 @@ const PomodoroTimer = ({ user }) => {
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'checkbox') {
+      const wasCompleted = habit.completed;
       habit.completed = !habit.completed;
+
+      // Award XP when marking habit as complete (not when unchecking)
+      if (!wasCompleted && habit.completed) {
+        updated[currentUser].pomodoro.xp += 5;
+        updated[currentUser].pomodoro.dailyXP += 5;
+        updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+        showToast(`✅ ${habit.name} completed! +5 XP`, 'success');
+      }
+
       updateCompletionPercentage(updated);
       setAllUsers(updated);
       saveToFirebase(currentUser, updated[currentUser]);
@@ -420,8 +492,18 @@ const PomodoroTimer = ({ user }) => {
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'counter') {
+      const wasCompleted = habit.completed;
       habit.count = Math.max(0, habit.count + delta);
       habit.completed = habit.count >= (habit.goal || 8);
+
+      // Award XP when reaching goal for first time
+      if (!wasCompleted && habit.completed) {
+        updated[currentUser].pomodoro.xp += 5;
+        updated[currentUser].pomodoro.dailyXP += 5;
+        updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+        showToast(`✅ ${habit.name} goal reached! +5 XP`, 'success');
+      }
+
       updateCompletionPercentage(updated);
       setAllUsers(updated);
       saveToFirebase(currentUser, updated[currentUser]);
