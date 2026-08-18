@@ -38,7 +38,20 @@ const PomodoroTimer = ({ user }) => {
   // Load data from Firebase
   useEffect(() => {
     const usersRef = ref(database, 'users');
+
+    // Set a timeout to prevent infinite loading
+    const loadTimeout = setTimeout(() => {
+      console.warn('Firebase loading timeout - initializing locally');
+      const newData = {};
+      USERS.forEach((userName) => {
+        newData[userName] = createNewUserData();
+      });
+      setAllUsers(newData);
+      setLoading(false);
+    }, 5000);
+
     const unsubscribe = onValue(usersRef, (snapshot) => {
+      clearTimeout(loadTimeout);
       if (snapshot.exists()) {
         setAllUsers(snapshot.val());
       } else {
@@ -47,13 +60,29 @@ const PomodoroTimer = ({ user }) => {
         USERS.forEach((userName) => {
           newData[userName] = createNewUserData();
         });
-        set(usersRef, newData);
+        set(usersRef, newData).catch((err) => {
+          console.error('Error initializing Firebase:', err);
+          setAllUsers(newData);
+        });
         setAllUsers(newData);
       }
       setLoading(false);
+    }, (error) => {
+      clearTimeout(loadTimeout);
+      console.error('Firebase error:', error);
+      // Initialize locally if Firebase fails
+      const newData = {};
+      USERS.forEach((userName) => {
+        newData[userName] = createNewUserData();
+      });
+      setAllUsers(newData);
+      setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      clearTimeout(loadTimeout);
+      unsubscribe();
+    };
   }, []);
 
   const createNewUserData = () => ({
