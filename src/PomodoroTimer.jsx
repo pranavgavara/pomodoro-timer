@@ -26,6 +26,8 @@ const PomodoroTimer = ({ user }) => {
   const [toasts, setToasts] = useState([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const prevDataRef = useRef({});
+  const prevDataRef = useRef({});
+  const [timeUntilReset, setTimeUntilReset] = useState('');
 
   // Request browser notification permission
   const requestNotificationPermission = async () => {
@@ -128,6 +130,27 @@ const PomodoroTimer = ({ user }) => {
       prevDataRef.current[userName] = JSON.parse(JSON.stringify(userData));
     });
   }, [allUsers, currentUser, notificationsEnabled]);
+  // Calculate time until daily reset (midnight)
+  useEffect(() => {
+    const updateResetTimer = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      
+      const timeLeft = tomorrow - now;
+      const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+      const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+      
+      setTimeUntilReset(`${hours}h ${minutes}m ${seconds}s`);
+    };
+    
+    updateResetTimer();
+    const interval = setInterval(updateResetTimer, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
 
 
   const intervalRef = useRef(null);
@@ -303,25 +326,37 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const toggleHabit = (habitId) => {
+    if (!currentUser) return; // Safety check
     const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) return; // Ensure user exists
+    
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'checkbox') {
       habit.completed = !habit.completed;
+      
+      // Update only current user
+      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, updated[currentUser]);
+      saveToFirebase(currentUser, userDataToSave);
     }
   };
 
   const updateWaterCount = (habitId, delta) => {
+    if (!currentUser) return; // Safety check
     const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) return; // Ensure user exists
+    
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'counter') {
       habit.count = Math.max(0, habit.count + delta);
       habit.completed = habit.count >= (habit.goal || 8);
+      
+      // Update only current user
+      const userDataToSave = JSON.parse(JSON.stringify(updated[currentUser]));
       updateCompletionPercentage(updated);
       setAllUsers(updated);
-      saveToFirebase(currentUser, updated[currentUser]);
+      saveToFirebase(currentUser, userDataToSave);
     }
   };
 
