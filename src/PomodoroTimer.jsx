@@ -192,7 +192,28 @@ const PomodoroTimer = ({ user }) => {
     const unsubscribe = onValue(usersRef, (snapshot) => {
       clearTimeout(loadTimeout);
       if (snapshot.exists()) {
-        setAllUsers(snapshot.val());
+        const data = snapshot.val();
+        // Migration: add missing habits to existing users
+        USERS.forEach((userName) => {
+          if (data[userName]) {
+            const existingHabitIds = new Set(data[userName].habits.map((h) => h.id));
+            DEFAULT_HABITS.forEach((defaultHabit) => {
+              if (!existingHabitIds.has(defaultHabit.id)) {
+                data[userName].habits.push({
+                  ...defaultHabit,
+                  completed: false,
+                  streak: 0,
+                  bestStreak: 0,
+                  count: 0,
+                  sessionsCompleted: 0,
+                });
+              }
+            });
+          }
+        });
+        setAllUsers(data);
+        // Save migrated data back to Firebase
+        set(usersRef, data).catch((err) => console.error('Error saving migrated data:', err));
       } else {
         // Initialize if no data
         const newData = {};
