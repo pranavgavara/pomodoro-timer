@@ -406,7 +406,17 @@ const PomodoroTimer = ({ user }) => {
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'checkbox') {
+      const wasCompleted = habit.completed;
       habit.completed = !habit.completed;
+
+      // Award XP when marking habit as complete (not when unchecking)
+      if (!wasCompleted && habit.completed) {
+        updated[currentUser].pomodoro.xp += 5;
+        updated[currentUser].pomodoro.dailyXP += 5;
+        updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+        showToast(`✅ ${habit.name} completed! +5 XP`, 'success');
+      }
+
       updateCompletionPercentage(updated);
       setAllUsers(updated);
       saveToFirebase(currentUser, updated[currentUser]);
@@ -420,8 +430,18 @@ const PomodoroTimer = ({ user }) => {
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'counter') {
+      const wasCompleted = habit.completed;
       habit.count = Math.max(0, habit.count + delta);
       habit.completed = habit.count >= (habit.goal || 8);
+
+      // Award XP when reaching goal for first time
+      if (!wasCompleted && habit.completed) {
+        updated[currentUser].pomodoro.xp += 5;
+        updated[currentUser].pomodoro.dailyXP += 5;
+        updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+        showToast(`✅ ${habit.name} goal reached! +5 XP`, 'success');
+      }
+
       updateCompletionPercentage(updated);
       setAllUsers(updated);
       saveToFirebase(currentUser, updated[currentUser]);
