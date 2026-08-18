@@ -1237,7 +1237,9 @@ const PomodoroTimer = ({ user }) => {
             <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px', color: '#7FFF00' }}>⚡ How to Gain XP</div>
             <div style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.6' }}>
               <div style={{ marginBottom: '8px' }}>✓ <strong>Base XP:</strong> +10 XP per session (timer or manual)</div>
-              <div style={{ marginBottom: '8px' }}>🔥 <strong>Bonus XP:</strong> +10 extra XP for first 3 sessions of the day (total +20)</div>
+              <div style={{ marginBottom: '8px' }}>🔥 <strong>Session Bonus:</strong> +10 extra XP for first 3 sessions of the day (total +20)</div>
+              <div style={{ marginBottom: '8px' }}>✅ <strong>Habit Completion:</strong> +5 XP per checkbox/counter habit completed</div>
+              <div style={{ marginBottom: '8px' }}>🐕 <strong>Daily Bonus (Mylo):</strong> +20 XP once per day (first to claim)</div>
               <div style={{ marginBottom: '8px' }}>📈 <strong>Leveling:</strong> 100 XP = 1 Level</div>
               <div>💪 <strong>Daily Goal:</strong> Complete 70%+ of habits to hit daily completion target</div>
             </div>
