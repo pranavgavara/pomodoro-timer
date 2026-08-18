@@ -10,23 +10,8 @@ const USERS = [
 ];
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      setError('Invalid email or password');
-      setLoading(false);
-    }
-  };
+  const [error, setError] = useState('');
 
   const quickLogin = async (user) => {
     setError('');
@@ -34,7 +19,7 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, user.email, user.password);
     } catch (err) {
-      setError('Login failed');
+      setError('Login failed: ' + err.message);
       setLoading(false);
     }
   };
@@ -91,78 +76,23 @@ export default function LoginPage() {
           <p style={{ fontSize: '16px', background: 'linear-gradient(90deg, #c8b6ff, #ff006e)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginTop: '10px', fontWeight: 'bold' }}>For 4 Friends 🚀</p>
         </div>
 
-        <form onSubmit={handleLogin} style={{ marginBottom: '30px' }}>
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g., pri@habits.local"
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: '#0f0f1e',
-                color: '#c8b6ff',
-                border: '2px solid #c8b6ff',
-                borderRadius: '8px',
-                fontFamily: 'inherit',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-              }}
-            />
+        {error && (
+          <div style={{
+            color: '#ff6b6b',
+            marginBottom: '20px',
+            padding: '12px',
+            background: '#ff6b6b20',
+            borderRadius: '8px',
+            fontSize: '14px',
+            textAlign: 'center',
+            border: '1px solid #ff6b6b'
+          }}>
+            {error}
           </div>
+        )}
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: '#0f0f1e',
-                color: '#c8b6ff',
-                border: '2px solid #c8b6ff',
-                borderRadius: '8px',
-                fontFamily: 'inherit',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          {error && (
-            <div style={{ color: '#ff6b6b', marginBottom: '15px', fontSize: '14px', textAlign: 'center' }}>
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: '#c8b6ff',
-              color: '#0f0f1e',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: '16px',
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        <div style={{ textAlign: 'center', marginBottom: '25px', color: '#999', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 'bold' }}>
-          ⚡ Quick Login
+        <div style={{ textAlign: 'center', marginBottom: '25px', color: '#999', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 'bold' }}>
+          👇 Click Your Name to Login
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '30px' }}>
@@ -211,35 +141,6 @@ export default function LoginPage() {
           ))}
         </div>
 
-        <div style={{
-          marginTop: '30px',
-          padding: '20px',
-          background: 'linear-gradient(135deg, #2a2547 0%, #3a3557 100%)',
-          borderRadius: '12px',
-          fontSize: '11px',
-          color: '#999',
-          lineHeight: '1.8',
-          border: '1px solid #c8b6ff30',
-        }}>
-          <div style={{ marginBottom: '12px', fontSize: '13px', fontWeight: 'bold', color: '#c8b6ff', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            📋 Test Accounts
-          </div>
-          {USERS.map((user) => (
-            <div key={user.email} style={{
-              padding: '8px 12px',
-              marginBottom: '6px',
-              background: `${user.color}15`,
-              borderRadius: '6px',
-              borderLeft: `3px solid ${user.color}`,
-              color: '#ddd',
-              fontSize: '10px',
-            }}>
-              <div style={{ fontWeight: 'bold', color: user.color }}>{user.emoji} {user.name}</div>
-              <div>📧 {user.email}</div>
-              <div>🔑 {user.password}</div>
-            </div>
-          ))}
-        </div>
 
         <style>{`
           @keyframes float {
