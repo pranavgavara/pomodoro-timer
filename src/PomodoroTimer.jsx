@@ -22,6 +22,113 @@ const PomodoroTimer = ({ user }) => {
   const [selectedHabitForPomodoro, setSelectedHabitForPomodoro] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [toasts, setToasts] = useState([]);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const prevDataRef = useRef({});
+
+  // Request browser notification permission
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        setNotificationsEnabled(true);
+      } else if (Notification.permission !== 'denied') {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          setNotificationsEnabled(true);
+          showToast('🔔 Notifications enabled!', 'success');
+        }
+      }
+    }
+  };
+
+  // Show toast notification
+  const showToast = (message, type = 'info', duration = 4000) => {
+    const id = Date.now();
+    const toast = { id, message, type };
+    setToasts((prev) => [...prev, toast]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, duration);
+  };
+
+  // Show browser notification
+  const showBrowserNotification = (title, options = {}) => {
+    if (notificationsEnabled && 'Notification' in window) {
+      new Notification(title, {
+        icon: '🏆',
+        badge: '🎯',
+        requireInteraction: false,
+        ...options,
+      });
+    }
+  };
+
+  // Monitor for changes in other users' data
+  useEffect(() => {
+    if (Object.keys(allUsers).length === 0) return;
+
+    // Compare with previous data to detect changes
+    Object.keys(allUsers).forEach((userName) => {
+      if (userName === currentUser) return; // Skip current user
+
+      const userData = allUsers[userName];
+      const prevData = prevDataRef.current[userName];
+
+      if (!prevData) {
+        prevDataRef.current[userName] = JSON.parse(JSON.stringify(userData));
+        return;
+      }
+
+      // Check if session count increased
+      if (userData.pomodoro.sessions > prevData.pomodoro.sessions) {
+        const message = `🎯 ${userName} just completed a session! Level ${userData.pomodoro.level} 🚀`;
+        showToast(message, 'success');
+        showBrowserNotification(`${userName} is crushing it! 🔥`, {
+          body: `They just leveled up to Level ${userData.pomodoro.level}!`,
+          tag: 'session-complete',
+        });
+      }
+
+      // Check if level increased
+      if (userData.pomodoro.level > prevData.pomodoro.level) {
+        const message = `⭐ ${userName} just leveled up to Level ${userData.pomodoro.level}! 🎉`;
+        showToast(message, 'success');
+        showBrowserNotification(`${userName} leveled up! ⭐`, {
+          body: `Now at Level ${userData.pomodoro.level}. Can you keep up?`,
+          tag: 'level-up',
+        });
+      }
+
+      // Check if habit completed
+      const completedHabits = userData.habits.filter((h) => h.completed);
+      const prevCompletedHabits = prevData.habits.filter((h) => h.completed);
+      if (completedHabits.length > prevCompletedHabits.length) {
+        const newCompleted = completedHabits.find((h) => !prevCompletedHabits.includes(h));
+        if (newCompleted) {
+          const message = `💪 ${userName} completed ${newCompleted.category} ${newCompleted.name}!`;
+          showToast(message, 'info');
+          showBrowserNotification(`${userName} is staying on track! 💪`, {
+            body: `Completed: ${newCompleted.name}`,
+            tag: 'habit-complete',
+          });
+        }
+      }
+
+      // Check if daily goal reached
+      if (userData.stats.completionPercentage >= 70 && prevData.stats.completionPercentage < 70) {
+        const message = `🏆 ${userName} hit their daily goal! 70%+ complete 🎉`;
+        showToast(message, 'success');
+        showBrowserNotification(`${userName} crushed today's goal! 🏆`, {
+          body: 'They hit 70% completion. Don\'t fall behind!',
+          tag: 'daily-goal',
+        });
+      }
+
+      prevDataRef.current[userName] = JSON.parse(JSON.stringify(userData));
+    });
+  }, [allUsers, currentUser, notificationsEnabled]);
+
+
   const intervalRef = useRef(null);
 
   const WORK_TIME = 25 * 60;
@@ -271,6 +378,23 @@ const PomodoroTimer = ({ user }) => {
         <div style={{ fontSize: '16px', fontWeight: 'bold', color: accentColor }}>
           Welcome, <span style={{ fontSize: '20px' }}>{userDisplayName}</span>! 👋
         </div>
+        <button
+          onClick={requestNotificationPermission}
+          style={{
+            marginTop: '10px',
+            padding: '8px 16px',
+            background: notificationsEnabled ? accentColor : '#1a1a2e',
+            color: notificationsEnabled ? '#0f0f1e' : accentColor,
+            border: `2px solid ${accentColor}`,
+            borderRadius: '6px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: '12px',
+          }}
+        >
+          {notificationsEnabled ? '🔔 Notifications On' : '🔕 Enable Notifications'}
+        </button>
         <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
           Only your data is editable. View others' progress below.
         </div>
@@ -745,6 +869,48 @@ const PomodoroTimer = ({ user }) => {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <div style={{
+        position: 'fixed',
+        top: '100px',
+        right: '20px',
+        zIndex: 10000,
+        maxWidth: '350px',
+      }}>
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            style={{
+              padding: '15px 20px',
+              marginBottom: '10px',
+              background: toast.type === 'success' ? '#2d5f2e' : '#2a2547',
+              border: `2px solid ${accentColor}`,
+              borderRadius: '10px',
+              color: accentColor,
+              fontWeight: 'bold',
+              fontSize: '14px',
+              animation: 'slideIn 0.3s ease-out',
+              boxShadow: `0 4px 20px ${accentColor}40`,
+            }}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(400px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+      `}</style>
     </div>
   );
 };
