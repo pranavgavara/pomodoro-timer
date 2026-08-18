@@ -32,6 +32,7 @@ const PomodoroTimer = ({ user }) => {
   const migrationDoneRef = useRef(false);
 
   const [toasts, setToasts] = useState([]);
+  const toastIdRef = useRef(0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
     const saved = localStorage.getItem('notificationsEnabled');
     return saved ? JSON.parse(saved) : false;
@@ -42,6 +43,7 @@ const PomodoroTimer = ({ user }) => {
   const [calendarView, setCalendarView] = useState(() => {
     return localStorage.getItem('calendarView') || 'week';
   });
+  const [bonusTaskCompleted, setBonusTaskCompleted] = useState({});
 
   // Request browser notification permission
   const requestNotificationPermission = async () => {
@@ -59,8 +61,8 @@ const PomodoroTimer = ({ user }) => {
   };
 
   // Show toast notification
-  const showToast = (message, type = 'info', duration = 4000) => {
-    const id = Date.now();
+  const showToast = (message, type = 'info', duration = 3000) => {
+    const id = ++toastIdRef.current;
     const toast = { id, message, type };
     setToasts((prev) => [...prev, toast]);
     setTimeout(() => {
@@ -71,14 +73,23 @@ const PomodoroTimer = ({ user }) => {
   // Show browser notification
   const showBrowserNotification = (title, options = {}) => {
     if (notificationsEnabled && 'Notification' in window) {
-      const notification = new Notification(title, {
-        icon: '🏆',
-        badge: '🎯',
-        requireInteraction: false,
-        ...options,
-      });
-      // Auto-close notification after 5 seconds
-      setTimeout(() => notification.close(), 5000);
+      try {
+        const notification = new Notification(title, {
+          icon: '🏆',
+          badge: '🎯',
+          requireInteraction: false,
+          tag: 'habit-notification',
+          ...options,
+        });
+        // Auto-close notification after 3 seconds
+        setTimeout(() => {
+          if (notification && notification.close) {
+            notification.close();
+          }
+        }, 3000);
+      } catch (err) {
+        console.error('Notification error:', err);
+      }
     }
   };
 
@@ -315,11 +326,12 @@ const PomodoroTimer = ({ user }) => {
     });
   };
 
-  // Load completion history from Firebase
+  // Load completion history and bonus task from Firebase
   useEffect(() => {
     const historyRef = ref(database, 'history');
+    const bonusRef = ref(database, 'bonusTask');
 
-    const unsubscribe = onValue(historyRef, (snapshot) => {
+    const unsubscribeHistory = onValue(historyRef, (snapshot) => {
       if (snapshot.exists()) {
         setCompletionHistory(snapshot.val());
       }
@@ -327,7 +339,18 @@ const PomodoroTimer = ({ user }) => {
       console.error('Error loading history:', error);
     });
 
-    return () => unsubscribe();
+    const unsubscribeBonus = onValue(bonusRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setBonusTaskCompleted(snapshot.val());
+      }
+    }, (error) => {
+      console.error('Error loading bonus task:', error);
+    });
+
+    return () => {
+      unsubscribeHistory();
+      unsubscribeBonus();
+    };
   }, []);
 
   // Daily reset at midnight
@@ -386,6 +409,7 @@ const PomodoroTimer = ({ user }) => {
         // Clear daily selections but keep permanent preferences
         localStorage.removeItem('selectedHabit');
         setSelectedHabitForPomodoro(null);
+        setBonusTaskCompleted({});
         showToast('📅 Daily reset! New habits unlocked for today', 'success');
       }
       // Always set lastResetDate to today (on first load or after reset)
@@ -627,6 +651,32 @@ const PomodoroTimer = ({ user }) => {
   const updateCompletionPercentage = (users) => {
     const completed = users[currentUser].habits.filter((h) => h.completed).length;
     users[currentUser].stats.completionPercentage = Math.round((completed / users[currentUser].habits.length) * 100);
+  };
+
+  const completeBonusTask = () => {
+    if (!currentUser) return;
+    const today = new Date().toISOString().split('T')[0];
+
+    // Check if already completed
+    if (bonusTaskCompleted[today]) return;
+
+    const updated = JSON.parse(JSON.stringify(allUsers));
+
+    // Award 20 XP
+    updated[currentUser].pomodoro.xp += 20;
+    updated[currentUser].pomodoro.dailyXP += 20;
+    updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
+
+    // Update Firebase
+    setAllUsers(updated);
+    saveToFirebase(currentUser, updated[currentUser]);
+
+    // Save bonus task completion
+    const bonusRef = ref(database, `bonusTask/${today}`);
+    set(bonusRef, { completedBy: currentUser, timestamp: new Date().toISOString() });
+
+    showToast(`🐕 ${currentUser} walked Mylo! +20 XP bonus`, 'success');
+    playSound();
   };
 
   const toggleTimer = () => {
@@ -892,6 +942,42 @@ const PomodoroTimer = ({ user }) => {
               🏆 Daily Goal Met! 70%+ habits completed
             </div>
           )}
+
+          {/* Bonus Task Section */}
+          <div style={{ marginTop: '30px', padding: '20px', background: '#1a2a1e', borderRadius: '12px', border: '2px solid #7FFF00' }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: '#7FFF00' }}>🐕 Daily Bonus Task</div>
+            <div style={{
+              padding: '15px',
+              background: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? '#333' : '#0f0f1e',
+              borderRadius: '8px',
+              border: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? '2px solid #999' : '2px solid #7FFF00',
+              cursor: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? 'default' : 'pointer',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              opacity: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? 0.6 : 1,
+            }}
+            onClick={() => {
+              const today = new Date().toISOString().split('T')[0];
+              if (!bonusTaskCompleted[today]) {
+                completeBonusTask();
+              }
+            }}>
+              <div>
+                <div style={{ fontWeight: 'bold', color: bonusTaskCompleted[new Date().toISOString().split('T')[0]] ? '#999' : '#7FFF00', marginBottom: '5px' }}>
+                  Take Mylo for a Walk
+                </div>
+                <div style={{ fontSize: '12px', color: '#999' }}>
+                  {bonusTaskCompleted[new Date().toISOString().split('T')[0]]
+                    ? `✅ Completed by ${bonusTaskCompleted[new Date().toISOString().split('T')[0]].completedBy}`
+                    : 'First one to complete earns 20 XP!'}
+                </div>
+              </div>
+              {!bonusTaskCompleted[new Date().toISOString().split('T')[0]] && (
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#7FFF00' }}>+20 XP</div>
+              )}
+            </div>
+          </div>
 
           {/* View Others Section */}
           <div style={{ marginTop: '50px', paddingTop: '30px', borderTop: `2px solid #333` }}>
