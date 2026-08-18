@@ -241,15 +241,17 @@ const PomodoroTimer = ({ user }) => {
 
   // Load completion history from Firebase
   useEffect(() => {
-    // Load last 60 days of history
-    const history = {};
     const historyRef = ref(database, 'history');
-    
-    onValue(historyRef, (snapshot) => {
+
+    const unsubscribe = onValue(historyRef, (snapshot) => {
       if (snapshot.exists()) {
         setCompletionHistory(snapshot.val());
       }
-    }).catch((err) => console.error('Error loading history:', err));
+    }, (error) => {
+      console.error('Error loading history:', error);
+    });
+
+    return () => unsubscribe();
   }, []);
 
 
