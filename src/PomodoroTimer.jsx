@@ -71,12 +71,14 @@ const PomodoroTimer = ({ user }) => {
   // Show browser notification
   const showBrowserNotification = (title, options = {}) => {
     if (notificationsEnabled && 'Notification' in window) {
-      new Notification(title, {
+      const notification = new Notification(title, {
         icon: '🏆',
         badge: '🎯',
         requireInteraction: false,
         ...options,
       });
+      // Auto-close notification after 5 seconds
+      setTimeout(() => notification.close(), 5000);
     }
   };
 
