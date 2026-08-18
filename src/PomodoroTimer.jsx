@@ -12,7 +12,8 @@ const PomodoroTimer = ({ user }) => {
     { id: 5, name: 'Water Intake', category: '💧', type: 'counter', goal: 8 },
   ];
 
-  const [currentUser, setCurrentUser] = useState('GP47');
+  // Will be set based on logged-in user
+  const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('habits');
   const [isWork, setIsWork] = useState(true);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -141,6 +142,11 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const userDisplayName = getUserName(user.email);
+  // Set current user to logged-in user
+  useEffect(() => {
+    setCurrentUser(userDisplayName);
+  }, [userDisplayName]);
+
 
   // Load data from Firebase
   useEffect(() => {
