@@ -237,31 +237,13 @@ const PomodoroTimer = ({ user }) => {
         @keyframes float { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(0); opacity: 0; } }
       `}</style>
 
-      {/* User Selector */}
-      <div style={{ padding: '20px', display: 'flex', gap: '10px', borderBottom: `2px solid #333333`, justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {USERS.map((userName) => (
-            <button
-              key={userName}
-              onClick={() => setCurrentUser(userName)}
-              style={{
-                padding: '10px 20px',
-                background: currentUser === userName ? accentColor : 'transparent',
-                color: currentUser === userName ? '#0f0f1e' : accentColor,
-                border: `2px solid ${accentColor}`,
-                borderRadius: '8px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: '14px',
-              }}
-            >
-              {userName}
-            </button>
-          ))}
+      {/* Header - Show logged in user */}
+      <div style={{ padding: '20px', borderBottom: `2px solid #333333`, textAlign: 'center' }}>
+        <div style={{ fontSize: '16px', fontWeight: 'bold', color: accentColor }}>
+          Welcome, <span style={{ fontSize: '20px' }}>{userDisplayName}</span>! 👋
         </div>
-        <div style={{ fontSize: '12px', color: '#999' }}>
-          Logged in as: <strong>{userDisplayName}</strong>
+        <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
+          Only your data is editable. View others' progress below.
         </div>
       </div>
 
@@ -413,6 +395,47 @@ const PomodoroTimer = ({ user }) => {
               🏆 Daily Goal Met! 70%+ habits completed
             </div>
           )}
+
+          {/* View Others Section */}
+          <div style={{ marginTop: '50px', paddingTop: '30px', borderTop: `2px solid #333` }}>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: accentColor }}>
+              👥 Others' Progress (Read-Only)
+            </div>
+            {USERS.filter((u) => u !== currentUser).map((otherUser) => {
+              const otherData = allUsers[otherUser] || createNewUserData();
+              const otherCompleted = otherData.habits.filter((h) => h.completed).length;
+              return (
+                <div key={otherUser} style={{
+                  padding: '15px',
+                  marginBottom: '15px',
+                  background: '#1a1a2e',
+                  borderRadius: '10px',
+                  border: `1px solid #333`,
+                }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '10px', color: accentColor }}>
+                    {otherUser}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
+                    Completion: {otherData.stats.completionPercentage}% ({otherCompleted}/{otherData.habits.length}) | Level: {otherData.pomodoro.level}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {otherData.habits.slice(0, 4).map((habit) => (
+                      <div key={habit.id} style={{
+                        padding: '6px 12px',
+                        background: habit.completed ? accentColor : '#0f0f1e',
+                        color: habit.completed ? '#0f0f1e' : accentColor,
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                      }}>
+                        {habit.category} {habit.completed ? '✅' : '⭕'}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -517,6 +540,33 @@ const PomodoroTimer = ({ user }) => {
 
           <div style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>
             Only completed sessions count. Skipping doesn't log to habits.
+          </div>
+
+          {/* View Others' XP */}
+          <div style={{ marginTop: '50px', paddingTop: '30px', borderTop: `2px solid #333`, maxWidth: '400px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: accentColor }}>
+              👥 Others' XP (Real-Time)
+            </div>
+            {USERS.filter((u) => u !== currentUser).map((otherUser) => {
+              const otherData = allUsers[otherUser] || createNewUserData();
+              return (
+                <div key={otherUser} style={{
+                  padding: '12px',
+                  marginBottom: '10px',
+                  background: '#1a1a2e',
+                  borderRadius: '8px',
+                  border: `1px solid #333`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}>
+                  <span style={{ fontWeight: 'bold' }}>{otherUser}</span>
+                  <span style={{ fontSize: '12px', color: '#999' }}>
+                    Level {otherData.pomodoro.level} • {otherData.pomodoro.xp} XP
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
