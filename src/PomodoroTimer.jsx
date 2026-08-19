@@ -363,9 +363,11 @@ const PomodoroTimer = ({ user }) => {
       const lastResetDate = localStorage.getItem('lastResetDate');
       const today = new Date().toISOString().split('T')[0];
 
+      console.log('[RESET CHECK]', { lastResetDate, today, shouldReset: lastResetDate && lastResetDate !== today });
+
       // Only reset if lastResetDate was previously set AND it's a different day
       if (lastResetDate && lastResetDate !== today) {
-        console.log('Performing daily reset...');
+        console.log('[RESET TRIGGERED] Date changed:', lastResetDate, '→', today);
         saveDailyCompletion();
 
         const updated = JSON.parse(JSON.stringify(allUsers));
@@ -421,7 +423,7 @@ const PomodoroTimer = ({ user }) => {
     checkAndReset();
     const interval = setInterval(checkAndReset, 60000);
     return () => clearInterval(interval);
-  }, [currentUser, allUsers, completionHistory]);
+  }, [currentUser, completionHistory]);
 
 
   const createNewUserData = () => ({
