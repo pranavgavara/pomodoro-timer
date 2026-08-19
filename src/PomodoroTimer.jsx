@@ -370,11 +370,12 @@ const PomodoroTimer = ({ user }) => {
     const checkAndReset = () => {
       const lastResetDate = localStorage.getItem('lastResetDate');
       const today = getLocalDate();
+      const shouldReset = lastResetDate && lastResetDate !== today;
 
-      console.log('[RESET CHECK]', { lastResetDate, today, shouldReset: lastResetDate && lastResetDate !== today });
+      console.log('[RESET CHECK]', { lastResetDate, today, shouldReset });
 
       // Only reset if lastResetDate was previously set AND it's a different day
-      if (lastResetDate && lastResetDate !== today) {
+      if (shouldReset) {
         console.log('[RESET TRIGGERED] Date changed:', lastResetDate, '→', today);
         saveDailyCompletion();
 
