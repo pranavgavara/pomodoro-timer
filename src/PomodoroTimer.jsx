@@ -188,6 +188,10 @@ const PomodoroTimer = ({ user }) => {
     return USERS.find((u) => u.toLowerCase() === emailPrefix.toLowerCase()) || emailPrefix;
   };
 
+  if (!user || !user.email) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0a0e27', color: '#c8b6ff' }}>Loading user data...</div>;
+  }
+
   const userDisplayName = getUserName(user.email);
   // Set current user to logged-in user
   useEffect(() => {
