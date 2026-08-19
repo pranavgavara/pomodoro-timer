@@ -876,7 +876,7 @@ const PomodoroTimer = ({ user }) => {
             >
               {notificationsEnabled ? '🔔 Notifications On' : '🔕 Enable Notifications'}
             </button>
-            {isSaving && <StateIndicator isSaving={true} />}
+            {isSaving && <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginLeft: 'var(--space-md)' }}>💾 Saving...</div>}
           </div>
         </div>
       </div>
