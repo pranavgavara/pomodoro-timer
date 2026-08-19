@@ -2,6 +2,36 @@ import React, { useState, useEffect, useRef } from 'react';
 import { database } from './firebase';
 import { ref, onValue, set, update } from 'firebase/database';
 
+// Professional UI Components
+const LoadingSkeleton = ({ width = '100%', height = '20px', className = '' }) => (
+  <div className={`skeleton ${className}`} style={{ width, height }} />
+);
+
+const StateIndicator = ({ isSaving, error }) => {
+  if (!isSaving && !error) return null;
+  return (
+    <div className="flex gap-sm align-items-center" style={{ fontSize: '12px', marginTop: '8px' }}>
+      {isSaving && <span className="loading">💾 Saving...</span>}
+      {error && <span style={{ color: '#ff6b6b' }}>❌ {error}</span>}
+    </div>
+  );
+};
+
+const StatCard = ({ label, value, icon, trend, loading = false }) => (
+  <div className="card card-sm" style={{ textAlign: 'center', minHeight: '80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+    <div style={{ fontSize: '24px', marginBottom: '8px' }}>{icon}</div>
+    <div className="text-secondary text-sm">{label}</div>
+    {loading ? (
+      <LoadingSkeleton width="60px" height="24px" style={{ margin: '8px auto' }} />
+    ) : (
+      <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '8px' }}>{value}</div>
+    )}
+    {trend && <div className="text-sm" style={{ color: trend > 0 ? '#4a8f4a' : '#8f4a4a', marginTop: '4px' }}>
+      {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}
+    </div>}
+  </div>
+);
+
 const PomodoroTimer = ({ user }) => {
   // Helper to get local date in YYYY-MM-DD format (not UTC)
   const getLocalDate = (date = new Date()) => {
@@ -786,78 +816,164 @@ const PomodoroTimer = ({ user }) => {
         @keyframes float { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(0); opacity: 0; } }
       `}</style>
 
-      {/* Header - Show logged in user */}
-      <div style={{ padding: '20px', borderBottom: `2px solid #333333`, textAlign: 'center' }}>
-        <div style={{ fontSize: '16px', fontWeight: 'bold', color: accentColor }}>
-          Welcome, <span style={{ fontSize: '20px' }}>{userDisplayName}</span>! 👋
-        </div>
-        <button
-          onClick={requestNotificationPermission}
-          style={{
-            marginTop: '10px',
-            padding: '8px 16px',
-            background: notificationsEnabled ? accentColor : '#1a1a2e',
-            color: notificationsEnabled ? '#0f0f1e' : accentColor,
-            border: `2px solid ${accentColor}`,
-            borderRadius: '6px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            fontSize: '12px',
-          }}
-        >
-          {notificationsEnabled ? '🔔 Notifications On' : '🔕 Enable Notifications'}
-        </button>
-        <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
-          Only your data is editable. View others' progress below.
+      {/* Header Section */}
+      <div style={{ background: `linear-gradient(135deg, ${bgColor} 0%, ${bgColor} 100%)`, padding: 'var(--space-xl)', borderBottom: '1px solid var(--color-bg-tertiary)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 0, right: 0, width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(200,182,255,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+
+        <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          {/* Welcome Section */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
+            <div>
+              <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-sm)' }}>
+                Welcome back, <span style={{ color: accentColor }}>{userDisplayName}</span>! 👋
+              </h1>
+              <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                Only your data is editable. Compete with friends below.
+              </p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="btn-secondary"
+              style={{ padding: 'var(--space-sm) var(--space-md)' }}
+            >
+              Logout
+            </button>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="grid grid-4" style={{ gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
+            <StatCard
+              icon="⭐"
+              label="Level"
+              value={userData.pomodoro.level}
+              loading={loading}
+            />
+            <StatCard
+              icon="✨"
+              label="Total XP"
+              value={userData.pomodoro.xp}
+              loading={loading}
+            />
+            <StatCard
+              icon="📊"
+              label="Today's Progress"
+              value={`${userData.stats.completionPercentage}%`}
+              loading={loading}
+            />
+            <StatCard
+              icon="⏰"
+              label="Reset In"
+              value={timeUntilReset.split('h')[0] + 'h'}
+              loading={loading}
+            />
+          </div>
+
+          {/* Notifications & State */}
+          <div className="flex-between" style={{ gap: 'var(--space-md)', flexWrap: 'wrap' }}>
+            <button
+              onClick={requestNotificationPermission}
+              className={notificationsEnabled ? 'btn-primary' : 'btn-secondary'}
+            >
+              {notificationsEnabled ? '🔔 Notifications On' : '🔕 Enable Notifications'}
+            </button>
+            {isSaving && <StateIndicator isSaving={true} />}
+          </div>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div style={{ padding: '15px', display: 'flex', gap: '10px', borderBottom: `2px solid #333` }}>
-        {[
-          { id: 'habits', label: '🎯 Habits' },
-          { id: 'leaderboard', label: '🏆 Leaderboard' },
-          ...(currentUser === 'GP47' ? [{ id: 'admin', label: '⚙️ Admin' }] : []),
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '10px 20px',
-              background: activeTab === tab.id ? accentColor : 'transparent',
-              color: activeTab === tab.id ? '#0f0f1e' : accentColor,
-              border: `2px solid ${accentColor}`,
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: '14px',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div style={{
+        padding: 'var(--space-lg)',
+        display: 'flex',
+        gap: 'var(--space-md)',
+        borderBottom: '1px solid var(--color-bg-tertiary)',
+        background: 'linear-gradient(to bottom, var(--color-bg-secondary) 0%, var(--color-bg) 100%)',
+        flexWrap: 'wrap'
+      }}>
+        <div className="flex gap-md" style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+          {[
+            { id: 'habits', label: '🎯 Habits' },
+            { id: 'leaderboard', label: '🏆 Leaderboard' },
+            ...(currentUser === 'GP47' ? [{ id: 'admin', label: '⚙️ Admin' }] : []),
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
+              style={{
+                position: 'relative',
+                borderBottom: activeTab === tab.id ? `3px solid ${accentColor}` : 'none',
+                borderRadius: '0',
+                background: activeTab === tab.id ? 'transparent' : 'transparent',
+                color: activeTab === tab.id ? accentColor : 'var(--color-text-secondary)',
+                padding: 'var(--space-md) var(--space-lg)',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* HABITS TAB */}
       {activeTab === 'habits' && (
-        <div style={{ padding: '30px', maxWidth: '600px', margin: '0 auto' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>
-            {currentUser}'s Daily Habits
-          </div>
-          <div style={{ fontSize: '12px', color: '#999', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
-            <span>📅 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-            <span>⏰ Reset in {timeUntilReset}</span>
-          </div>
-          <div style={{ fontSize: '14px', color: '#999', marginBottom: '30px' }}>
-            {(() => {
-              const today = getLocalDate();
-              const myloCompleted = bonusTaskCompleted[today] ? 1 : 0;
-              const totalCount = completedHabits + myloCompleted;
-              const totalItems = userData.habits.length + 1;
-              return `Completion: ${userData.stats.completionPercentage}% (${totalCount}/${totalItems})`;
-            })()}
+        <div style={{ padding: 'var(--space-xl)', maxWidth: '800px', margin: '0 auto' }}>
+          {/* Section Header */}
+          <div style={{ marginBottom: 'var(--space-lg)' }}>
+            <h2 style={{ marginBottom: 'var(--space-md)' }}>{currentUser}'s Daily Habits</h2>
+
+            {/* Progress Card */}
+            <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
+              <div className="flex-between" style={{ marginBottom: 'var(--space-md)' }}>
+                <div>
+                  <div className="text-secondary text-sm">Today's Progress</div>
+                  <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'bold', marginTop: 'var(--space-sm)' }}>
+                    {userData.stats.completionPercentage}%
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="text-secondary text-sm">Completion</div>
+                  {(() => {
+                    const today = getLocalDate();
+                    const myloCompleted = bonusTaskCompleted[today] ? 1 : 0;
+                    const totalCount = completedHabits + myloCompleted;
+                    const totalItems = userData.habits.length + 1;
+                    return <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'bold', marginTop: 'var(--space-sm)' }}>{totalCount}/{totalItems}</div>;
+                  })()}
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div style={{
+                width: '100%',
+                height: '12px',
+                background: 'var(--color-bg-secondary)',
+                borderRadius: 'var(--radius-full)',
+                overflow: 'hidden',
+                marginBottom: 'var(--space-sm)'
+              }}>
+                <div style={{
+                  width: `${userData.stats.completionPercentage}%`,
+                  height: '100%',
+                  background: `linear-gradient(90deg, ${accentColor} 0%, ${accentColor} 100%)`,
+                  transition: 'width var(--transition-base)',
+                  boxShadow: `0 0 10px ${accentColor}40`
+                }} />
+              </div>
+
+              {/* Progress Info */}
+              <div className="flex-between" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                <span>📅 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                <span>⏰ Resets in {timeUntilReset}</span>
+              </div>
+
+              {/* Status Badge */}
+              {userData.stats.completionPercentage >= 70 && (
+                <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-sm) var(--space-md)', background: 'var(--color-success)', borderRadius: 'var(--radius-md)', textAlign: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'bold' }}>
+                  🏆 Daily Goal Achieved!
+                </div>
+              )}
+            </div>
           </div>
 
           {userData.habits.map((habit) => (
