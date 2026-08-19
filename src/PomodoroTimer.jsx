@@ -408,7 +408,7 @@ const PomodoroTimer = ({ user }) => {
     checkAndReset();
     const interval = setInterval(checkAndReset, 60000);
     return () => clearInterval(interval);
-  }, [currentUser, completionHistory]);
+  }, [currentUser]);
 
 
   const createNewUserData = () => ({
