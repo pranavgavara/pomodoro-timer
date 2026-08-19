@@ -2,6 +2,36 @@ import React, { useState, useEffect, useRef } from 'react';
 import { database } from './firebase';
 import { ref, onValue, set, update } from 'firebase/database';
 
+// Professional UI Components
+const LoadingSkeleton = ({ width = '100%', height = '20px', className = '' }) => (
+  <div className={`skeleton ${className}`} style={{ width, height }} />
+);
+
+const StateIndicator = ({ isSaving, error }) => {
+  if (!isSaving && !error) return null;
+  return (
+    <div className="flex gap-sm align-items-center" style={{ fontSize: '12px', marginTop: '8px' }}>
+      {isSaving && <span className="loading">💾 Saving...</span>}
+      {error && <span style={{ color: '#ff6b6b' }}>❌ {error}</span>}
+    </div>
+  );
+};
+
+const StatCard = ({ label, value, icon, trend, loading = false }) => (
+  <div className="card card-sm" style={{ textAlign: 'center', minHeight: '80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+    <div style={{ fontSize: '24px', marginBottom: '8px' }}>{icon}</div>
+    <div className="text-secondary text-sm">{label}</div>
+    {loading ? (
+      <LoadingSkeleton width="60px" height="24px" style={{ margin: '8px auto' }} />
+    ) : (
+      <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '8px' }}>{value}</div>
+    )}
+    {trend && <div className="text-sm" style={{ color: trend > 0 ? '#4a8f4a' : '#8f4a4a', marginTop: '4px' }}>
+      {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}
+    </div>}
+  </div>
+);
+
 const PomodoroTimer = ({ user }) => {
   // Helper to get local date in YYYY-MM-DD format (not UTC)
   const getLocalDate = (date = new Date()) => {
@@ -39,6 +69,7 @@ const PomodoroTimer = ({ user }) => {
     return saved ? JSON.parse(saved) : false;
   });
   const prevDataRef = useRef({});
+  const [isSaving, setIsSaving] = useState(false);
   const [timeUntilReset, setTimeUntilReset] = useState('');
   const [completionHistory, setCompletionHistory] = useState({});
   const [calendarView, setCalendarView] = useState(() => {
@@ -227,7 +258,17 @@ const PomodoroTimer = ({ user }) => {
     const unsubscribe = onValue(usersRef, (snapshot) => {
       clearTimeout(loadTimeout);
       if (snapshot.exists()) {
-        const data = snapshot.val();
+        let data = snapshot.val();
+
+        // Validate all user data
+        USERS.forEach((userName) => {
+          if (data[userName]) {
+            data[userName] = validateUserData(data[userName], userName);
+          } else {
+            data[userName] = createNewUserData();
+          }
+        });
+
         // Migration: ensure all habits have proper structure (only once)
         if (!migrationDoneRef.current) {
           migrationDoneRef.current = true;
@@ -300,17 +341,26 @@ const PomodoroTimer = ({ user }) => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const dateStr = getLocalDate(yesterday);
-    
-    // Save each user's completion status for yesterday
-    Object.keys(allUsers).forEach((userName) => {
+
+    // Save each user's completion status for yesterday - await all saves
+    const historyPromises = Object.keys(allUsers).map((userName) => {
       const userData = allUsers[userName];
       const historyRef = ref(database, `history/${dateStr}/${userName}`);
-      set(historyRef, {
+      return set(historyRef, {
         completed: userData.stats.completionPercentage >= 70,
         percentage: userData.stats.completionPercentage,
         timestamp: yesterday.toISOString(),
-      }).catch((err) => console.error('Error saving history:', err));
+      }).catch((err) => {
+        console.error('Error saving history for', userName, ':', err);
+        return Promise.reject(err);
+      });
     });
+
+    try {
+      await Promise.all(historyPromises);
+    } catch (err) {
+      console.error('Failed to save some history records:', err);
+    }
   };
 
   // Load completion history and bonus task from Firebase
@@ -344,9 +394,9 @@ const PomodoroTimer = ({ user }) => {
 
   // Daily reset at midnight
   useEffect(() => {
-    if (!currentUser || Object.keys(allUsers).length === 0) return;
+    if (!currentUser || Object.keys(allUsers).length === 0 || Object.keys(completionHistory).length === 0) return;
 
-    const checkAndReset = () => {
+    const checkAndReset = async () => {
       const lastResetDate = localStorage.getItem('lastResetDate');
       const today = getLocalDate();
       const shouldReset = lastResetDate && lastResetDate !== today;
@@ -356,9 +406,13 @@ const PomodoroTimer = ({ user }) => {
       // Only reset if lastResetDate was previously set AND it's a different day
       if (shouldReset) {
         console.log('[RESET TRIGGERED] Date changed:', lastResetDate, '→', today);
-        saveDailyCompletion();
+
+        // Save completion history first
+        await saveDailyCompletion();
 
         const updated = JSON.parse(JSON.stringify(allUsers));
+        const savePromises = [];
+
         USERS.forEach((userName) => {
           if (updated[userName]) {
             const yesterday = new Date();
@@ -393,10 +447,15 @@ const PomodoroTimer = ({ user }) => {
             updated[userName].pomodoro.dailyXP = 0;
             updated[userName].stats.completionPercentage = 0;
 
-            saveToFirebase(userName, updated[userName]);
+            // Collect all save promises
+            savePromises.push(saveToFirebase(userName, updated[userName]));
           }
         });
 
+        // Wait for all saves to complete before updating UI
+        await Promise.all(savePromises);
+
+        // Clear Mylo bonus AFTER all saves complete
         setAllUsers(updated);
         setBonusTaskCompleted({});
         showToast('📅 Daily reset! New habits unlocked for today', 'success');
@@ -433,9 +492,44 @@ const PomodoroTimer = ({ user }) => {
     },
   });
 
-  const saveToFirebase = (userName, userData) => {
-    const userRef = ref(database, `users/${userName}`);
-    set(userRef, userData);
+  const validateUserData = (userData, userName) => {
+    if (!userData || typeof userData !== 'object') {
+      console.warn(`Invalid user data for ${userName}, creating new`);
+      return createNewUserData();
+    }
+    // Ensure critical fields exist
+    if (!userData.pomodoro) userData.pomodoro = { sessions: 0, xp: 0, level: 1, dailyXP: 0, sessionsToday: 0 };
+    if (!userData.stats) userData.stats = { completionPercentage: 0, perfectWeekCount: 0 };
+    if (!userData.habits || !Array.isArray(userData.habits)) userData.habits = [];
+    // Ensure XP values are valid numbers
+    if (typeof userData.pomodoro.xp !== 'number') userData.pomodoro.xp = 0;
+    if (typeof userData.pomodoro.level !== 'number') userData.pomodoro.level = Math.floor(userData.pomodoro.xp / 100) + 1;
+    if (typeof userData.pomodoro.dailyXP !== 'number') userData.pomodoro.dailyXP = 0;
+    if (typeof userData.stats.completionPercentage !== 'number') userData.stats.completionPercentage = 0;
+    return userData;
+  };
+
+  const saveCountRef = useRef(0);
+
+  const saveToFirebase = async (userName, userData) => {
+    if (!userName || !userData) {
+      console.error('Invalid save: missing userName or userData', { userName, userData });
+      return;
+    }
+    saveCountRef.current++;
+    setIsSaving(true);
+    try {
+      const userRef = ref(database, `users/${userName}`);
+      await set(userRef, userData);
+    } catch (err) {
+      console.error('Firebase save failed for', userName, ':', err);
+      showToast('❌ Failed to save. Check your connection.', 'error');
+    } finally {
+      saveCountRef.current--;
+      if (saveCountRef.current === 0) {
+        setIsSaving(false);
+      }
+    }
   };
 
 
@@ -473,9 +567,12 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const toggleHabit = (habitId) => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return;
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'checkbox') {
@@ -504,9 +601,12 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const updateWaterCount = (habitId, delta) => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return;
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'counter') {
@@ -536,9 +636,12 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const addPomodoroSession = (habitId) => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return;
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'pomodoro') {
@@ -566,9 +669,12 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const removePomodoroSession = (habitId) => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return;
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'pomodoro' && habit.sessionsCompleted > 0) {
@@ -580,8 +686,10 @@ const PomodoroTimer = ({ user }) => {
       updated[currentUser].pomodoro.sessions = Math.max(0, updated[currentUser].pomodoro.sessions - 1);
       updated[currentUser].pomodoro.sessionsToday = Math.max(0, updated[currentUser].pomodoro.sessionsToday - 1);
 
-      const bonus = (updated[currentUser].pomodoro.sessionsToday + 1) <= 3 ? 10 : 0;
-      const xpGain = 10 + bonus;
+      // Check if the removed session was a bonus session (first 3 of the day)
+      // If sessionsToday < 3 after removal, we removed a bonus session
+      const wasBonus = updated[currentUser].pomodoro.sessionsToday < 3;
+      const xpGain = 10 + (wasBonus ? 10 : 0);
       updated[currentUser].pomodoro.xp = Math.max(0, updated[currentUser].pomodoro.xp - xpGain);
       updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - xpGain);
       updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
@@ -595,69 +703,90 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const updateCompletionPercentage = (users, bonusData = bonusTaskCompleted) => {
+    if (!users || !users[currentUser]) {
+      console.error('Invalid update: missing users or currentUser data');
+      return;
+    }
     const today = getLocalDate();
     const habitCompleted = users[currentUser].habits.filter((h) => h.completed).length;
     const myloCompleted = bonusData[today] ? 1 : 0;
     const totalCompleted = habitCompleted + myloCompleted;
     const totalItems = users[currentUser].habits.length + 1; // 7 habits + 1 Mylo
-    users[currentUser].stats.completionPercentage = Math.round((totalCompleted / totalItems) * 100);
+    users[currentUser].stats.completionPercentage = Math.floor((totalCompleted / totalItems) * 100);
   };
 
   const completeBonusTask = () => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const today = getLocalDate();
 
     // Check if already completed
     if (bonusTaskCompleted[today]) return;
 
     const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     // Award 20 XP
     updated[currentUser].pomodoro.xp += 20;
     updated[currentUser].pomodoro.dailyXP += 20;
     updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
 
-    // Update Firebase
-    setAllUsers(updated);
-    saveToFirebase(currentUser, updated[currentUser]);
-
-    // Save bonus task completion - immediately update local state
+    // Update completion percentage BEFORE saving
     const bonusData = { completedBy: currentUser, timestamp: new Date().toISOString() };
+    const updatedBonusData = { ...bonusTaskCompleted, [today]: bonusData };
+    updateCompletionPercentage(updated, updatedBonusData);
+
+    // Update local state
+    setAllUsers(updated);
+    setBonusTaskCompleted(updatedBonusData);
+
+    // Save to Firebase
+    saveToFirebase(currentUser, updated[currentUser]);
     const bonusRef = ref(database, `bonusTask/${today}`);
     set(bonusRef, bonusData).catch((err) => {
       console.error('Error saving bonus task:', err);
+      showToast('❌ Failed to save bonus task. Try again.', 'error');
     });
-    setBonusTaskCompleted({ ...bonusTaskCompleted, [today]: bonusData });
 
     showToast(`🐕 ${currentUser} walked Mylo! +20 XP bonus`, 'success');
     playSound();
   };
 
   const removeBonusTask = () => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const today = getLocalDate();
 
     if (!bonusTaskCompleted[today] || bonusTaskCompleted[today].completedBy !== currentUser) return;
 
     const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     // Remove 20 XP
     updated[currentUser].pomodoro.xp = Math.max(0, updated[currentUser].pomodoro.xp - 20);
     updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - 20);
     updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
 
-    // Update Firebase
-    setAllUsers(updated);
-    saveToFirebase(currentUser, updated[currentUser]);
-
-    // Remove from Firebase
-    const bonusRef = ref(database, `bonusTask/${today}`);
-    set(bonusRef, null);
-
-    // Update local state
+    // Update completion percentage BEFORE saving
     const newBonusState = { ...bonusTaskCompleted };
     delete newBonusState[today];
+    updateCompletionPercentage(updated, newBonusState);
+
+    // Update local state
+    setAllUsers(updated);
     setBonusTaskCompleted(newBonusState);
+
+    // Save to Firebase
+    saveToFirebase(currentUser, updated[currentUser]);
+    const bonusRef = ref(database, `bonusTask/${today}`);
+    set(bonusRef, null).catch((err) => {
+      console.error('Error removing bonus task:', err);
+      showToast('❌ Failed to remove bonus task. Try again.', 'error');
+    });
 
     showToast(`↶ Bonus task removed! -20 XP`, 'info');
   };
@@ -687,78 +816,164 @@ const PomodoroTimer = ({ user }) => {
         @keyframes float { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(0); opacity: 0; } }
       `}</style>
 
-      {/* Header - Show logged in user */}
-      <div style={{ padding: '20px', borderBottom: `2px solid #333333`, textAlign: 'center' }}>
-        <div style={{ fontSize: '16px', fontWeight: 'bold', color: accentColor }}>
-          Welcome, <span style={{ fontSize: '20px' }}>{userDisplayName}</span>! 👋
-        </div>
-        <button
-          onClick={requestNotificationPermission}
-          style={{
-            marginTop: '10px',
-            padding: '8px 16px',
-            background: notificationsEnabled ? accentColor : '#1a1a2e',
-            color: notificationsEnabled ? '#0f0f1e' : accentColor,
-            border: `2px solid ${accentColor}`,
-            borderRadius: '6px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            fontSize: '12px',
-          }}
-        >
-          {notificationsEnabled ? '🔔 Notifications On' : '🔕 Enable Notifications'}
-        </button>
-        <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
-          Only your data is editable. View others' progress below.
+      {/* Header Section */}
+      <div style={{ background: `linear-gradient(135deg, ${bgColor} 0%, ${bgColor} 100%)`, padding: 'var(--space-xl)', borderBottom: '1px solid var(--color-bg-tertiary)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 0, right: 0, width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(200,182,255,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+
+        <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          {/* Welcome Section */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
+            <div>
+              <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-sm)' }}>
+                Welcome back, <span style={{ color: accentColor }}>{userDisplayName}</span>! 👋
+              </h1>
+              <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                Only your data is editable. Compete with friends below.
+              </p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="btn-secondary"
+              style={{ padding: 'var(--space-sm) var(--space-md)' }}
+            >
+              Logout
+            </button>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="grid grid-4" style={{ gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
+            <StatCard
+              icon="⭐"
+              label="Level"
+              value={userData.pomodoro.level}
+              loading={loading}
+            />
+            <StatCard
+              icon="✨"
+              label="Total XP"
+              value={userData.pomodoro.xp}
+              loading={loading}
+            />
+            <StatCard
+              icon="📊"
+              label="Today's Progress"
+              value={`${userData.stats.completionPercentage}%`}
+              loading={loading}
+            />
+            <StatCard
+              icon="⏰"
+              label="Reset In"
+              value={timeUntilReset.split('h')[0] + 'h'}
+              loading={loading}
+            />
+          </div>
+
+          {/* Notifications & State */}
+          <div className="flex-between" style={{ gap: 'var(--space-md)', flexWrap: 'wrap' }}>
+            <button
+              onClick={requestNotificationPermission}
+              className={notificationsEnabled ? 'btn-primary' : 'btn-secondary'}
+            >
+              {notificationsEnabled ? '🔔 Notifications On' : '🔕 Enable Notifications'}
+            </button>
+            {isSaving && <StateIndicator isSaving={true} />}
+          </div>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div style={{ padding: '15px', display: 'flex', gap: '10px', borderBottom: `2px solid #333` }}>
-        {[
-          { id: 'habits', label: '🎯 Habits' },
-          { id: 'leaderboard', label: '🏆 Leaderboard' },
-          ...(currentUser === 'GP47' ? [{ id: 'admin', label: '⚙️ Admin' }] : []),
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '10px 20px',
-              background: activeTab === tab.id ? accentColor : 'transparent',
-              color: activeTab === tab.id ? '#0f0f1e' : accentColor,
-              border: `2px solid ${accentColor}`,
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: '14px',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div style={{
+        padding: 'var(--space-lg)',
+        display: 'flex',
+        gap: 'var(--space-md)',
+        borderBottom: '1px solid var(--color-bg-tertiary)',
+        background: 'linear-gradient(to bottom, var(--color-bg-secondary) 0%, var(--color-bg) 100%)',
+        flexWrap: 'wrap'
+      }}>
+        <div className="flex gap-md" style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+          {[
+            { id: 'habits', label: '🎯 Habits' },
+            { id: 'leaderboard', label: '🏆 Leaderboard' },
+            ...(currentUser === 'GP47' ? [{ id: 'admin', label: '⚙️ Admin' }] : []),
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
+              style={{
+                position: 'relative',
+                borderBottom: activeTab === tab.id ? `3px solid ${accentColor}` : 'none',
+                borderRadius: '0',
+                background: activeTab === tab.id ? 'transparent' : 'transparent',
+                color: activeTab === tab.id ? accentColor : 'var(--color-text-secondary)',
+                padding: 'var(--space-md) var(--space-lg)',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* HABITS TAB */}
       {activeTab === 'habits' && (
-        <div style={{ padding: '30px', maxWidth: '600px', margin: '0 auto' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>
-            {currentUser}'s Daily Habits
-          </div>
-          <div style={{ fontSize: '12px', color: '#999', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
-            <span>📅 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-            <span>⏰ Reset in {timeUntilReset}</span>
-          </div>
-          <div style={{ fontSize: '14px', color: '#999', marginBottom: '30px' }}>
-            {(() => {
-              const today = getLocalDate();
-              const myloCompleted = bonusTaskCompleted[today] ? 1 : 0;
-              const totalCount = completedHabits + myloCompleted;
-              const totalItems = userData.habits.length + 1;
-              return `Completion: ${userData.stats.completionPercentage}% (${totalCount}/${totalItems})`;
-            })()}
+        <div style={{ padding: 'var(--space-xl)', maxWidth: '800px', margin: '0 auto' }}>
+          {/* Section Header */}
+          <div style={{ marginBottom: 'var(--space-lg)' }}>
+            <h2 style={{ marginBottom: 'var(--space-md)' }}>{currentUser}'s Daily Habits</h2>
+
+            {/* Progress Card */}
+            <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
+              <div className="flex-between" style={{ marginBottom: 'var(--space-md)' }}>
+                <div>
+                  <div className="text-secondary text-sm">Today's Progress</div>
+                  <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'bold', marginTop: 'var(--space-sm)' }}>
+                    {userData.stats.completionPercentage}%
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="text-secondary text-sm">Completion</div>
+                  {(() => {
+                    const today = getLocalDate();
+                    const myloCompleted = bonusTaskCompleted[today] ? 1 : 0;
+                    const totalCount = completedHabits + myloCompleted;
+                    const totalItems = userData.habits.length + 1;
+                    return <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'bold', marginTop: 'var(--space-sm)' }}>{totalCount}/{totalItems}</div>;
+                  })()}
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div style={{
+                width: '100%',
+                height: '12px',
+                background: 'var(--color-bg-secondary)',
+                borderRadius: 'var(--radius-full)',
+                overflow: 'hidden',
+                marginBottom: 'var(--space-sm)'
+              }}>
+                <div style={{
+                  width: `${userData.stats.completionPercentage}%`,
+                  height: '100%',
+                  background: `linear-gradient(90deg, ${accentColor} 0%, ${accentColor} 100%)`,
+                  transition: 'width var(--transition-base)',
+                  boxShadow: `0 0 10px ${accentColor}40`
+                }} />
+              </div>
+
+              {/* Progress Info */}
+              <div className="flex-between" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                <span>📅 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                <span>⏰ Resets in {timeUntilReset}</span>
+              </div>
+
+              {/* Status Badge */}
+              {userData.stats.completionPercentage >= 70 && (
+                <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-sm) var(--space-md)', background: 'var(--color-success)', borderRadius: 'var(--radius-md)', textAlign: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 'bold' }}>
+                  🏆 Daily Goal Achieved!
+                </div>
+              )}
+            </div>
           </div>
 
           {userData.habits.map((habit) => (
