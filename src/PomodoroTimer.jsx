@@ -2,36 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { database } from './firebase';
 import { ref, onValue, set, update } from 'firebase/database';
 
-// Professional UI Components
-const LoadingSkeleton = ({ width = '100%', height = '20px', className = '' }) => (
-  <div className={`skeleton ${className}`} style={{ width, height }} />
-);
-
-const StateIndicator = ({ isSaving, error }) => {
-  if (!isSaving && !error) return null;
-  return (
-    <div className="flex gap-sm align-items-center" style={{ fontSize: '12px', marginTop: '8px' }}>
-      {isSaving && <span className="loading">💾 Saving...</span>}
-      {error && <span style={{ color: '#ff6b6b' }}>❌ {error}</span>}
-    </div>
-  );
-};
-
-const StatCard = ({ label, value, icon, trend, loading = false }) => (
-  <div className="card card-sm" style={{ textAlign: 'center', minHeight: '80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-    <div style={{ fontSize: '24px', marginBottom: '8px' }}>{icon}</div>
-    <div className="text-secondary text-sm">{label}</div>
-    {loading ? (
-      <LoadingSkeleton width="60px" height="24px" style={{ margin: '8px auto' }} />
-    ) : (
-      <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '8px' }}>{value}</div>
-    )}
-    {trend && <div className="text-sm" style={{ color: trend > 0 ? '#4a8f4a' : '#8f4a4a', marginTop: '4px' }}>
-      {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}
-    </div>}
-  </div>
-);
-
 const PomodoroTimer = ({ user }) => {
   // Helper to get local date in YYYY-MM-DD format (not UTC)
   const getLocalDate = (date = new Date()) => {
