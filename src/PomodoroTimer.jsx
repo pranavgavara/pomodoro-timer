@@ -27,15 +27,8 @@ const PomodoroTimer = ({ user }) => {
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('activeTab') || 'habits';
   });
-  const [isWork, setIsWork] = useState(true);
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [isRunning, setIsRunning] = useState(false);
   const [allUsers, setAllUsers] = useState({});
   const [showCompletionAnimation, setShowCompletionAnimation] = useState(false);
-  const [selectedHabitForPomodoro, setSelectedHabitForPomodoro] = useState(() => {
-    const saved = localStorage.getItem('selectedHabit');
-    return saved ? parseInt(saved) : null;
-  });
   const [loading, setLoading] = useState(true);
   const migrationDoneRef = useRef(false);
 
@@ -188,11 +181,6 @@ const PomodoroTimer = ({ user }) => {
 
 
 
-  const intervalRef = useRef(null);
-
-  const WORK_TIME = 25 * 60;
-  const BREAK_TIME = 5 * 60;
-
   // Get user display name from email
   const getUserName = (userEmail) => {
     const emailPrefix = userEmail.split('@')[0];
@@ -204,15 +192,6 @@ const PomodoroTimer = ({ user }) => {
   useEffect(() => {
     setCurrentUser(userDisplayName);
   }, [userDisplayName]);
-
-  // Persist selected habit to localStorage
-  useEffect(() => {
-    if (selectedHabitForPomodoro) {
-      localStorage.setItem('selectedHabit', selectedHabitForPomodoro.toString());
-    } else {
-      localStorage.removeItem('selectedHabit');
-    }
-  }, [selectedHabitForPomodoro]);
 
   // Persist active tab to localStorage
   useEffect(() => {
@@ -419,9 +398,6 @@ const PomodoroTimer = ({ user }) => {
         });
 
         setAllUsers(updated);
-        // Clear daily selections but keep permanent preferences
-        localStorage.removeItem('selectedHabit');
-        setSelectedHabitForPomodoro(null);
         setBonusTaskCompleted({});
         showToast('📅 Daily reset! New habits unlocked for today', 'success');
       }
@@ -462,49 +438,6 @@ const PomodoroTimer = ({ user }) => {
     set(userRef, userData);
   };
 
-  // Timer logic
-  useEffect(() => {
-    if (!isRunning) return;
-
-    intervalRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          playSound();
-          if (isWork && selectedHabitForPomodoro) {
-            const updated = JSON.parse(JSON.stringify(allUsers));
-            const habit = updated[currentUser].habits.find((h) => h.id === selectedHabitForPomodoro);
-
-            if (habit && habit.type === 'pomodoro') {
-              habit.sessionsCompleted = (habit.sessionsCompleted || 0) + 1;
-              if (habit.sessionsCompleted >= habit.sessionsRequired) {
-                habit.completed = true;
-              }
-            }
-
-            updated[currentUser].pomodoro.sessions += 1;
-            updated[currentUser].pomodoro.sessionsToday += 1;
-
-            const bonus = updated[currentUser].pomodoro.sessionsToday <= 3 ? 10 : 0;
-            const xpGain = 10 + bonus;
-            updated[currentUser].pomodoro.xp += xpGain;
-            updated[currentUser].pomodoro.dailyXP += xpGain;
-            updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
-
-            updateCompletionPercentage(updated);
-            setAllUsers(updated);
-            saveToFirebase(currentUser, updated[currentUser]);
-            setShowCompletionAnimation(true);
-            setTimeout(() => setShowCompletionAnimation(false), 1000);
-          }
-          setIsWork(!isWork);
-          return isWork ? BREAK_TIME : WORK_TIME;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(intervalRef.current);
-  }, [isRunning, isWork, currentUser, selectedHabitForPomodoro, allUsers]);
 
   const playSound = () => {
     try {
@@ -729,29 +662,6 @@ const PomodoroTimer = ({ user }) => {
     showToast(`↶ Bonus task removed! -20 XP`, 'info');
   };
 
-  const toggleTimer = () => {
-    if (!isRunning && isWork && !selectedHabitForPomodoro) {
-      alert('Select a habit first!');
-      return;
-    }
-    setIsRunning(!isRunning);
-  };
-
-  const resetTimer = () => {
-    setIsRunning(false);
-    setTimeLeft(isWork ? WORK_TIME : BREAK_TIME);
-  };
-
-  const skipSession = () => {
-    setIsWork(!isWork);
-    setTimeLeft(isWork ? BREAK_TIME : WORK_TIME);
-    setIsRunning(false);
-  };
-
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const progress = isWork ? 1 - (timeLeft / WORK_TIME) : 1 - (timeLeft / BREAK_TIME);
-
   const bgColor = '#0f0f1e';
   const accentColor = '#c8b6ff';
   const darkAccent = '#a78bde';
@@ -762,7 +672,6 @@ const PomodoroTimer = ({ user }) => {
 
   const userData = allUsers[currentUser] || createNewUserData();
   const completedHabits = userData.habits.filter((h) => h.completed).length;
-  const selectedHabit = userData.habits.find((h) => h.id === selectedHabitForPomodoro);
 
   return (
     <div style={{ minHeight: '100vh', background: bgColor, color: accentColor, fontFamily: '"Fredoka One", "Righteous", sans-serif' }}>
@@ -809,7 +718,6 @@ const PomodoroTimer = ({ user }) => {
       <div style={{ padding: '15px', display: 'flex', gap: '10px', borderBottom: `2px solid #333` }}>
         {[
           { id: 'habits', label: '🎯 Habits' },
-          { id: 'pomodoro', label: '⏱️ Pomodoro' },
           { id: 'leaderboard', label: '🏆 Leaderboard' },
           ...(currentUser === 'GP47' ? [{ id: 'admin', label: '⚙️ Admin' }] : []),
         ].map((tab) => (
@@ -1112,139 +1020,7 @@ const PomodoroTimer = ({ user }) => {
         </div>
       )}
 
-      {/* POMODORO TAB */}
-      {activeTab === 'pomodoro' && (
-        <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ marginBottom: '30px', textAlign: 'center', width: '100%', maxWidth: '400px' }}>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px', color: '#999' }}>
-              SELECT HABIT TO WORK ON
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
-              {userData.habits.filter((h) => h.type === 'pomodoro').map((habit) => (
-                <button
-                  key={habit.id}
-                  onClick={() => setSelectedHabitForPomodoro(habit.id)}
-                  style={{
-                    padding: '10px 15px',
-                    background: selectedHabitForPomodoro === habit.id ? accentColor : '#1a1a2e',
-                    color: selectedHabitForPomodoro === habit.id ? '#0f0f1e' : accentColor,
-                    border: `2px solid ${accentColor}`,
-                    borderRadius: '8px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: '12px',
-                  }}
-                >
-                  {habit.category} {habit.name}
-                </button>
-              ))}
-            </div>
-            {selectedHabit && (
-              <div style={{ marginTop: '15px', fontSize: '14px', color: accentColor }}>
-                Working on: <strong>{selectedHabit.category} {selectedHabit.name}</strong>
-                <div style={{ fontSize: '12px', color: '#999', marginTop: '5px' }}>
-                  Progress: {selectedHabit.sessionsCompleted}/{selectedHabit.sessionsRequired} sessions
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <div style={{ fontSize: '48px', fontWeight: 'bold', color: accentColor }}>Level {userData.pomodoro.level}</div>
-            <div style={{ fontSize: '14px', color: '#999', marginTop: '10px' }}>Today: {userData.pomodoro.dailyXP} XP | Sessions: {userData.pomodoro.sessionsToday}</div>
-
-            <div style={{ width: '300px', height: '15px', background: '#333', borderRadius: '10px', margin: '15px auto', border: `2px solid ${accentColor}`, overflow: 'hidden' }}>
-              <div style={{ width: `${(userData.pomodoro.xp % 100)}%`, height: '100%', background: accentColor, transition: 'width 0.3s' }} />
-            </div>
-            <div style={{ fontSize: '12px' }}>{userData.pomodoro.xp % 100}/100 XP</div>
-          </div>
-
-          <div style={{ position: 'relative', marginBottom: '60px' }}>
-            <svg width="240" height="240" style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx="120" cy="120" r="110" fill="none" stroke="#374151" strokeWidth="2" />
-              <circle
-                cx="120"
-                cy="120"
-                r="110"
-                fill="none"
-                stroke={accentColor}
-                strokeWidth="3"
-                strokeDasharray={`${2 * Math.PI * 110}`}
-                strokeDashoffset={`${2 * Math.PI * 110 * (1 - progress)}`}
-                strokeLinecap="round"
-                style={{ transition: 'stroke-dashoffset 0.5s linear' }}
-              />
-            </svg>
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-              <div style={{ fontSize: '64px', fontWeight: 'bold', color: accentColor, fontFamily: 'monospace' }}>
-                {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-              </div>
-              <div style={{ fontSize: '12px', color: accentColor, marginTop: '8px', fontWeight: 'bold' }}>
-                {isWork ? '🔥 FOCUS' : '☕ BREAK'}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '40px' }}>
-            <button
-              onClick={toggleTimer}
-              style={{
-                padding: '12px 24px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                background: accentColor,
-                color: '#0f0f1e',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              {isRunning ? 'Pause' : 'Start'}
-            </button>
-            <button onClick={resetTimer} style={{ padding: '12px 24px', fontSize: '14px', fontWeight: 'bold', background: 'transparent', color: accentColor, border: `2px solid ${accentColor}`, borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>
-              Reset
-            </button>
-            <button onClick={skipSession} style={{ padding: '12px 24px', fontSize: '14px', fontWeight: 'bold', background: 'transparent', color: accentColor, border: `2px solid ${accentColor}`, borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit' }}>
-              Skip
-            </button>
-          </div>
-
-          <div style={{ fontSize: '12px', color: '#999', textAlign: 'center' }}>
-            Only completed sessions count. Skipping doesn't log to habits.
-          </div>
-
-          {/* View Others' XP */}
-          <div style={{ marginTop: '50px', paddingTop: '30px', borderTop: `2px solid #333`, maxWidth: '400px' }}>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: accentColor }}>
-              👥 Others' XP (Real-Time)
-            </div>
-            {USERS.filter((u) => u !== currentUser).map((otherUser) => {
-              const otherData = allUsers[otherUser] || createNewUserData();
-              return (
-                <div key={otherUser} style={{
-                  padding: '12px',
-                  marginBottom: '10px',
-                  background: '#1a1a2e',
-                  borderRadius: '8px',
-                  border: `1px solid #333`,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}>
-                  <span style={{ fontWeight: 'bold' }}>{otherUser}</span>
-                  <span style={{ fontSize: '12px', color: '#999' }}>
-                    Level {otherData.pomodoro.level} • {otherData.pomodoro.xp} XP
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-            {/* LEADERBOARD TAB */}
+      {/* LEADERBOARD TAB */}
       {activeTab === 'leaderboard' && (
         <div style={{ padding: '30px', maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: accentColor }}>🏆 Leaderboard</div>
