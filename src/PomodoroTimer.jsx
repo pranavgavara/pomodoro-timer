@@ -311,17 +311,26 @@ const PomodoroTimer = ({ user }) => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const dateStr = getLocalDate(yesterday);
-    
-    // Save each user's completion status for yesterday
-    Object.keys(allUsers).forEach((userName) => {
+
+    // Save each user's completion status for yesterday - await all saves
+    const historyPromises = Object.keys(allUsers).map((userName) => {
       const userData = allUsers[userName];
       const historyRef = ref(database, `history/${dateStr}/${userName}`);
-      set(historyRef, {
+      return set(historyRef, {
         completed: userData.stats.completionPercentage >= 70,
         percentage: userData.stats.completionPercentage,
         timestamp: yesterday.toISOString(),
-      }).catch((err) => console.error('Error saving history:', err));
+      }).catch((err) => {
+        console.error('Error saving history for', userName, ':', err);
+        return Promise.reject(err);
+      });
     });
+
+    try {
+      await Promise.all(historyPromises);
+    } catch (err) {
+      console.error('Failed to save some history records:', err);
+    }
   };
 
   // Load completion history and bonus task from Firebase
@@ -355,9 +364,9 @@ const PomodoroTimer = ({ user }) => {
 
   // Daily reset at midnight
   useEffect(() => {
-    if (!currentUser || Object.keys(allUsers).length === 0) return;
+    if (!currentUser || Object.keys(allUsers).length === 0 || Object.keys(completionHistory).length === 0) return;
 
-    const checkAndReset = () => {
+    const checkAndReset = async () => {
       const lastResetDate = localStorage.getItem('lastResetDate');
       const today = getLocalDate();
       const shouldReset = lastResetDate && lastResetDate !== today;
@@ -367,9 +376,13 @@ const PomodoroTimer = ({ user }) => {
       // Only reset if lastResetDate was previously set AND it's a different day
       if (shouldReset) {
         console.log('[RESET TRIGGERED] Date changed:', lastResetDate, '→', today);
-        saveDailyCompletion();
+
+        // Save completion history first
+        await saveDailyCompletion();
 
         const updated = JSON.parse(JSON.stringify(allUsers));
+        const savePromises = [];
+
         USERS.forEach((userName) => {
           if (updated[userName]) {
             const yesterday = new Date();
@@ -404,10 +417,15 @@ const PomodoroTimer = ({ user }) => {
             updated[userName].pomodoro.dailyXP = 0;
             updated[userName].stats.completionPercentage = 0;
 
-            saveToFirebase(userName, updated[userName]);
+            // Collect all save promises
+            savePromises.push(saveToFirebase(userName, updated[userName]));
           }
         });
 
+        // Wait for all saves to complete before updating UI
+        await Promise.all(savePromises);
+
+        // Clear Mylo bonus AFTER all saves complete
         setAllUsers(updated);
         setBonusTaskCompleted({});
         showToast('📅 Daily reset! New habits unlocked for today', 'success');
@@ -419,7 +437,7 @@ const PomodoroTimer = ({ user }) => {
     checkAndReset();
     const interval = setInterval(checkAndReset, 60000);
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser, completionHistory]);
 
 
   const createNewUserData = () => ({
@@ -461,20 +479,26 @@ const PomodoroTimer = ({ user }) => {
     return userData;
   };
 
+  const saveCountRef = useRef(0);
+
   const saveToFirebase = async (userName, userData) => {
     if (!userName || !userData) {
       console.error('Invalid save: missing userName or userData', { userName, userData });
       return;
     }
+    saveCountRef.current++;
     setIsSaving(true);
     try {
       const userRef = ref(database, `users/${userName}`);
       await set(userRef, userData);
     } catch (err) {
-      console.error('Firebase save failed:', err);
+      console.error('Firebase save failed for', userName, ':', err);
       showToast('❌ Failed to save. Check your connection.', 'error');
     } finally {
-      setIsSaving(false);
+      saveCountRef.current--;
+      if (saveCountRef.current === 0) {
+        setIsSaving(false);
+      }
     }
   };
 
