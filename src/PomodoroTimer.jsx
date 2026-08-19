@@ -3,6 +3,14 @@ import { database } from './firebase';
 import { ref, onValue, set, update } from 'firebase/database';
 
 const PomodoroTimer = ({ user }) => {
+  // Helper to get local date in YYYY-MM-DD format (not UTC)
+  const getLocalDate = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const USERS = ['GP47', 'Pri', 'Nikki', 'Sid'];
   const DEFAULT_HABITS = [
     { id: 1, name: 'Exercise', category: '💪', type: 'pomodoro', sessionsRequired: 2 },
@@ -312,7 +320,7 @@ const PomodoroTimer = ({ user }) => {
   const saveDailyCompletion = async () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const dateStr = yesterday.toISOString().split('T')[0];
+    const dateStr = getLocalDate(yesterday);
     
     // Save each user's completion status for yesterday
     Object.keys(allUsers).forEach((userName) => {
@@ -361,7 +369,7 @@ const PomodoroTimer = ({ user }) => {
 
     const checkAndReset = () => {
       const lastResetDate = localStorage.getItem('lastResetDate');
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDate();
 
       console.log('[RESET CHECK]', { lastResetDate, today, shouldReset: lastResetDate && lastResetDate !== today });
 
@@ -375,7 +383,7 @@ const PomodoroTimer = ({ user }) => {
           if (updated[userName]) {
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            const yesterdayStr = getLocalDate(yesterday);
             const yesterdayData = completionHistory[yesterdayStr];
             const wasCompleted = yesterdayData?.[userName]?.completed || false;
 
@@ -653,7 +661,7 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const updateCompletionPercentage = (users, bonusData = bonusTaskCompleted) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDate();
     const habitCompleted = users[currentUser].habits.filter((h) => h.completed).length;
     const myloCompleted = bonusData[today] ? 1 : 0;
     const totalCompleted = habitCompleted + myloCompleted;
@@ -663,7 +671,7 @@ const PomodoroTimer = ({ user }) => {
 
   const completeBonusTask = () => {
     if (!currentUser) return;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDate();
 
     // Check if already completed
     if (bonusTaskCompleted[today]) return;
@@ -693,7 +701,7 @@ const PomodoroTimer = ({ user }) => {
 
   const removeBonusTask = () => {
     if (!currentUser) return;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDate();
 
     if (!bonusTaskCompleted[today] || bonusTaskCompleted[today].completedBy !== currentUser) return;
 
@@ -836,7 +844,7 @@ const PomodoroTimer = ({ user }) => {
           </div>
           <div style={{ fontSize: '14px', color: '#999', marginBottom: '30px' }}>
             {(() => {
-              const today = new Date().toISOString().split('T')[0];
+              const today = getLocalDate();
               const myloCompleted = bonusTaskCompleted[today] ? 1 : 0;
               const totalCount = completedHabits + myloCompleted;
               const totalItems = userData.habits.length + 1;
@@ -998,7 +1006,7 @@ const PomodoroTimer = ({ user }) => {
           <div style={{ marginTop: '30px', padding: '20px', background: '#1a2a1e', borderRadius: '12px', border: '2px solid #7FFF00' }}>
             <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', color: '#7FFF00' }}>🐕 Daily Bonus Task</div>
             {(() => {
-              const today = new Date().toISOString().split('T')[0];
+              const today = getLocalDate();
               const completed = bonusTaskCompleted[today];
               const isCompletedByCurrentUser = completed && completed.completedBy === currentUser;
 
@@ -1318,7 +1326,7 @@ const PomodoroTimer = ({ user }) => {
                     {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, idx) => {
                       const date = new Date();
                       date.setDate(date.getDate() - (date.getDay() - idx - 1 + 7) % 7);
-                      const dateStr = date.toISOString().split('T')[0];
+                      const dateStr = getLocalDate(date);
                       const dayHistory = completionHistory[dateStr] || {};
 
                       const userColors = {
@@ -1373,7 +1381,7 @@ const PomodoroTimer = ({ user }) => {
                     {Array.from({ length: 30 }).map((_, i) => {
                       const date = new Date();
                       date.setDate(date.getDate() - (29 - i));
-                      const dateStr = date.toISOString().split('T')[0];
+                      const dateStr = getLocalDate(date);
                       const dayHistory = completionHistory[dateStr] || {};
 
                       const userColors = {
@@ -1651,7 +1659,7 @@ const PomodoroTimer = ({ user }) => {
                     if (updated[userName]) {
                       const yesterday = new Date();
                       yesterday.setDate(yesterday.getDate() - 1);
-                      const yesterdayStr = yesterday.toISOString().split('T')[0];
+                      const yesterdayStr = getLocalDate(yesterday);
                       const yesterdayData = completionHistory[yesterdayStr];
                       const wasCompleted = yesterdayData?.[userName]?.completed || false;
 
@@ -1685,7 +1693,7 @@ const PomodoroTimer = ({ user }) => {
                   });
                   setAllUsers(updated);
                   setBonusTaskCompleted({});
-                  localStorage.setItem('lastResetDate', new Date().toISOString().split('T')[0]);
+                  localStorage.setItem('lastResetDate', getLocalDate());
                   showToast('✅ Daily reset forced!', 'success');
                 }
               }}
