@@ -289,6 +289,76 @@ button:disabled {
 .animate-glow { animation: glow-pulse 2s ease-in-out infinite; }
 .animate-slide-in { animation: slide-in-right 0.4s ease-out; }
 
+/* ===== HEADER STYLES ===== */
+.header-section {
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.05) 0%, rgba(167, 139, 222, 0.05) 100%);
+  border-bottom: 1px solid rgba(0, 217, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.header-title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent-purple));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: var(--space-sm);
+}
+
+/* ===== PROGRESS SECTION ===== */
+.progress-section {
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.08) 0%, rgba(167, 139, 222, 0.08) 100%);
+  border: 1px solid rgba(0, 217, 255, 0.15);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin: var(--space-lg) 0;
+  backdrop-filter: blur(10px);
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+  font-size: var(--font-size-sm);
+}
+
+.progress-percentage {
+  font-size: var(--font-size-xl);
+  font-weight: bold;
+  color: var(--color-primary);
+  font-family: var(--font-display);
+}
+
+/* ===== TAB NAVIGATION ===== */
+.tab-nav {
+  border-bottom: 1px solid rgba(0, 217, 255, 0.1);
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--color-text-secondary);
+  padding: var(--space-md) 0;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: var(--font-size-base);
+  transition: all var(--transition-base);
+}
+
+.tab-btn:hover {
+  color: var(--color-primary);
+}
+
+.tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   :root {
@@ -299,6 +369,14 @@ button:disabled {
   }
 
   .card {
+    padding: var(--space-md);
+  }
+
+  .stat-card {
+    min-height: 80px;
+  }
+
+  .progress-section {
     padding: var(--space-md);
   }
 }

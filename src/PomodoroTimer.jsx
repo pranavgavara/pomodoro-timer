@@ -828,20 +828,18 @@ const PomodoroTimer = ({ user }) => {
       `}</style>
 
       {/* Header Section */}
-      <div style={{ background: `linear-gradient(135deg, ${bgColor} 0%, ${bgColor} 100%)`, padding: 'var(--space-xl)', borderBottom: '1px solid var(--color-bg-tertiary)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, right: 0, width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(200,182,255,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+      <div className="header-section" style={{ padding: 'var(--space-xl)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 0, right: 0, width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(0,217,255,0.1) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
 
         <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
           {/* Welcome Section */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
-            <div>
-              <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-sm)' }}>
-                Welcome back, <span style={{ color: accentColor }}>{userDisplayName}</span>! 👋
-              </h1>
-              <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
-                Only your data is editable. Compete with friends below.
-              </p>
-            </div>
+          <div style={{ marginBottom: 'var(--space-xl)' }}>
+            <h1 className="header-title" style={{ marginBottom: 'var(--space-xs)' }}>
+              Welcome back, {userDisplayName}! 🎯
+            </h1>
+            <p className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+              Track your habits, compete with friends, and level up! 🚀
+            </p>
           </div>
 
           {/* Quick Stats */}
@@ -879,18 +877,34 @@ const PomodoroTimer = ({ user }) => {
             {isSaving && <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginLeft: 'var(--space-md)' }}>💾 Saving...</div>}
           </div>
         </div>
+
+        {/* Daily Progress Section */}
+        <div className="progress-section" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div className="progress-label">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+              <span>📈 Today's Progress</span>
+              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}>({userData.habits.filter(h => h.completed).length + (bonusTaskCompleted[getLocalDate()] ? 1 : 0)}/8)</span>
+            </div>
+            <span className="progress-percentage">{userData.stats.completionPercentage}%</span>
+          </div>
+          <div className="progress-bar">
+            <div className="progress-bar-fill" style={{ width: `${userData.stats.completionPercentage}%` }} />
+          </div>
+          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-sm)' }}>
+            {userData.stats.completionPercentage >= 70 ? '✅ Daily goal achieved!' : `Complete ${Math.ceil((7 - (userData.habits.filter(h => h.completed).length + (bonusTaskCompleted[getLocalDate()] ? 1 : 0))) / 8 * 100)} more to reach 70%`}
+          </div>
+        </div>
       </div>
 
       {/* Tab Navigation */}
       <div style={{
         padding: 'var(--space-lg)',
-        display: 'flex',
-        gap: 'var(--space-md)',
-        borderBottom: '1px solid var(--color-bg-tertiary)',
-        background: 'linear-gradient(to bottom, var(--color-bg-secondary) 0%, var(--color-bg) 100%)',
-        flexWrap: 'wrap'
+        background: bgColor,
+        maxWidth: '1200px',
+        margin: '0 auto',
+        width: '100%'
       }}>
-        <div className="flex gap-md" style={{ width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+        <div className="tab-nav">
           {[
             { id: 'habits', label: '🎯 Habits' },
             { id: 'leaderboard', label: '🏆 Leaderboard' },
@@ -899,15 +913,7 @@ const PomodoroTimer = ({ user }) => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
-              style={{
-                position: 'relative',
-                borderBottom: activeTab === tab.id ? `3px solid ${accentColor}` : 'none',
-                borderRadius: '0',
-                background: activeTab === tab.id ? 'transparent' : 'transparent',
-                color: activeTab === tab.id ? accentColor : 'var(--color-text-secondary)',
-                padding: 'var(--space-md) var(--space-lg)',
-              }}
+              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
             >
               {tab.label}
             </button>
