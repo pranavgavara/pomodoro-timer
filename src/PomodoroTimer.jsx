@@ -39,6 +39,7 @@ const PomodoroTimer = ({ user }) => {
     return saved ? JSON.parse(saved) : false;
   });
   const prevDataRef = useRef({});
+  const [isSaving, setIsSaving] = useState(false);
   const [timeUntilReset, setTimeUntilReset] = useState('');
   const [completionHistory, setCompletionHistory] = useState({});
   const [calendarView, setCalendarView] = useState(() => {
@@ -227,7 +228,17 @@ const PomodoroTimer = ({ user }) => {
     const unsubscribe = onValue(usersRef, (snapshot) => {
       clearTimeout(loadTimeout);
       if (snapshot.exists()) {
-        const data = snapshot.val();
+        let data = snapshot.val();
+
+        // Validate all user data
+        USERS.forEach((userName) => {
+          if (data[userName]) {
+            data[userName] = validateUserData(data[userName], userName);
+          } else {
+            data[userName] = createNewUserData();
+          }
+        });
+
         // Migration: ensure all habits have proper structure (only once)
         if (!migrationDoneRef.current) {
           migrationDoneRef.current = true;
@@ -433,9 +444,38 @@ const PomodoroTimer = ({ user }) => {
     },
   });
 
-  const saveToFirebase = (userName, userData) => {
-    const userRef = ref(database, `users/${userName}`);
-    set(userRef, userData);
+  const validateUserData = (userData, userName) => {
+    if (!userData || typeof userData !== 'object') {
+      console.warn(`Invalid user data for ${userName}, creating new`);
+      return createNewUserData();
+    }
+    // Ensure critical fields exist
+    if (!userData.pomodoro) userData.pomodoro = { sessions: 0, xp: 0, level: 1, dailyXP: 0, sessionsToday: 0 };
+    if (!userData.stats) userData.stats = { completionPercentage: 0, perfectWeekCount: 0 };
+    if (!userData.habits || !Array.isArray(userData.habits)) userData.habits = [];
+    // Ensure XP values are valid numbers
+    if (typeof userData.pomodoro.xp !== 'number') userData.pomodoro.xp = 0;
+    if (typeof userData.pomodoro.level !== 'number') userData.pomodoro.level = Math.floor(userData.pomodoro.xp / 100) + 1;
+    if (typeof userData.pomodoro.dailyXP !== 'number') userData.pomodoro.dailyXP = 0;
+    if (typeof userData.stats.completionPercentage !== 'number') userData.stats.completionPercentage = 0;
+    return userData;
+  };
+
+  const saveToFirebase = async (userName, userData) => {
+    if (!userName || !userData) {
+      console.error('Invalid save: missing userName or userData', { userName, userData });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const userRef = ref(database, `users/${userName}`);
+      await set(userRef, userData);
+    } catch (err) {
+      console.error('Firebase save failed:', err);
+      showToast('❌ Failed to save. Check your connection.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
 
@@ -473,9 +513,12 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const toggleHabit = (habitId) => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return;
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'checkbox') {
@@ -504,9 +547,12 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const updateWaterCount = (habitId, delta) => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return;
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'counter') {
@@ -536,9 +582,12 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const addPomodoroSession = (habitId) => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return;
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'pomodoro') {
@@ -566,9 +615,12 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const removePomodoroSession = (habitId) => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const updated = JSON.parse(JSON.stringify(allUsers));
-    if (!updated[currentUser]) return;
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     const habit = updated[currentUser].habits.find((h) => h.id === habitId);
     if (habit && habit.type === 'pomodoro' && habit.sessionsCompleted > 0) {
@@ -580,8 +632,10 @@ const PomodoroTimer = ({ user }) => {
       updated[currentUser].pomodoro.sessions = Math.max(0, updated[currentUser].pomodoro.sessions - 1);
       updated[currentUser].pomodoro.sessionsToday = Math.max(0, updated[currentUser].pomodoro.sessionsToday - 1);
 
-      const bonus = (updated[currentUser].pomodoro.sessionsToday + 1) <= 3 ? 10 : 0;
-      const xpGain = 10 + bonus;
+      // Check if the removed session was a bonus session (first 3 of the day)
+      // If sessionsToday < 3 after removal, we removed a bonus session
+      const wasBonus = updated[currentUser].pomodoro.sessionsToday < 3;
+      const xpGain = 10 + (wasBonus ? 10 : 0);
       updated[currentUser].pomodoro.xp = Math.max(0, updated[currentUser].pomodoro.xp - xpGain);
       updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - xpGain);
       updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
@@ -595,69 +649,90 @@ const PomodoroTimer = ({ user }) => {
   };
 
   const updateCompletionPercentage = (users, bonusData = bonusTaskCompleted) => {
+    if (!users || !users[currentUser]) {
+      console.error('Invalid update: missing users or currentUser data');
+      return;
+    }
     const today = getLocalDate();
     const habitCompleted = users[currentUser].habits.filter((h) => h.completed).length;
     const myloCompleted = bonusData[today] ? 1 : 0;
     const totalCompleted = habitCompleted + myloCompleted;
     const totalItems = users[currentUser].habits.length + 1; // 7 habits + 1 Mylo
-    users[currentUser].stats.completionPercentage = Math.round((totalCompleted / totalItems) * 100);
+    users[currentUser].stats.completionPercentage = Math.floor((totalCompleted / totalItems) * 100);
   };
 
   const completeBonusTask = () => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const today = getLocalDate();
 
     // Check if already completed
     if (bonusTaskCompleted[today]) return;
 
     const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     // Award 20 XP
     updated[currentUser].pomodoro.xp += 20;
     updated[currentUser].pomodoro.dailyXP += 20;
     updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
 
-    // Update Firebase
-    setAllUsers(updated);
-    saveToFirebase(currentUser, updated[currentUser]);
-
-    // Save bonus task completion - immediately update local state
+    // Update completion percentage BEFORE saving
     const bonusData = { completedBy: currentUser, timestamp: new Date().toISOString() };
+    const updatedBonusData = { ...bonusTaskCompleted, [today]: bonusData };
+    updateCompletionPercentage(updated, updatedBonusData);
+
+    // Update local state
+    setAllUsers(updated);
+    setBonusTaskCompleted(updatedBonusData);
+
+    // Save to Firebase
+    saveToFirebase(currentUser, updated[currentUser]);
     const bonusRef = ref(database, `bonusTask/${today}`);
     set(bonusRef, bonusData).catch((err) => {
       console.error('Error saving bonus task:', err);
+      showToast('❌ Failed to save bonus task. Try again.', 'error');
     });
-    setBonusTaskCompleted({ ...bonusTaskCompleted, [today]: bonusData });
 
     showToast(`🐕 ${currentUser} walked Mylo! +20 XP bonus`, 'success');
     playSound();
   };
 
   const removeBonusTask = () => {
-    if (!currentUser) return;
+    if (!currentUser || isSaving) return;
     const today = getLocalDate();
 
     if (!bonusTaskCompleted[today] || bonusTaskCompleted[today].completedBy !== currentUser) return;
 
     const updated = JSON.parse(JSON.stringify(allUsers));
+    if (!updated[currentUser]) {
+      console.error('User not found:', currentUser);
+      return;
+    }
 
     // Remove 20 XP
     updated[currentUser].pomodoro.xp = Math.max(0, updated[currentUser].pomodoro.xp - 20);
     updated[currentUser].pomodoro.dailyXP = Math.max(0, updated[currentUser].pomodoro.dailyXP - 20);
     updated[currentUser].pomodoro.level = Math.floor(updated[currentUser].pomodoro.xp / 100) + 1;
 
-    // Update Firebase
-    setAllUsers(updated);
-    saveToFirebase(currentUser, updated[currentUser]);
-
-    // Remove from Firebase
-    const bonusRef = ref(database, `bonusTask/${today}`);
-    set(bonusRef, null);
-
-    // Update local state
+    // Update completion percentage BEFORE saving
     const newBonusState = { ...bonusTaskCompleted };
     delete newBonusState[today];
+    updateCompletionPercentage(updated, newBonusState);
+
+    // Update local state
+    setAllUsers(updated);
     setBonusTaskCompleted(newBonusState);
+
+    // Save to Firebase
+    saveToFirebase(currentUser, updated[currentUser]);
+    const bonusRef = ref(database, `bonusTask/${today}`);
+    set(bonusRef, null).catch((err) => {
+      console.error('Error removing bonus task:', err);
+      showToast('❌ Failed to remove bonus task. Try again.', 'error');
+    });
 
     showToast(`↶ Bonus task removed! -20 XP`, 'info');
   };
