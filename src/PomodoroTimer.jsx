@@ -846,25 +846,25 @@ const PomodoroTimer = ({ user }) => {
 
           {/* Quick Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
-            <div style={{ background: 'var(--color-bg-secondary)', padding: 'var(--space-md)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>⭐</div>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>Level</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{userData.pomodoro.level}</div>
+            <div className="stat-card">
+              <div className="stat-icon">⭐</div>
+              <div className="stat-label">Level</div>
+              <div className="stat-value">{userData.pomodoro.level}</div>
             </div>
-            <div style={{ background: 'var(--color-bg-secondary)', padding: 'var(--space-md)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>✨</div>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>Total XP</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{userData.pomodoro.xp}</div>
+            <div className="stat-card">
+              <div className="stat-icon">✨</div>
+              <div className="stat-label">Total XP</div>
+              <div className="stat-value">{userData.pomodoro.xp}</div>
             </div>
-            <div style={{ background: 'var(--color-bg-secondary)', padding: 'var(--space-md)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>📊</div>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>Today's Progress</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{userData.stats.completionPercentage}%</div>
+            <div className="stat-card">
+              <div className="stat-icon">📊</div>
+              <div className="stat-label">Today's Progress</div>
+              <div className="stat-value">{userData.stats.completionPercentage}%</div>
             </div>
-            <div style={{ background: 'var(--color-bg-secondary)', padding: 'var(--space-md)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏰</div>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>Reset In</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{timeUntilReset.split('h')[0]}h</div>
+            <div className="stat-card">
+              <div className="stat-icon">⏰</div>
+              <div className="stat-label">Reset In</div>
+              <div className="stat-value">{timeUntilReset.split('h')[0]}h</div>
             </div>
           </div>
 
