@@ -997,7 +997,7 @@ const PomodoroTimer = ({ user }) => {
             </div>
           ))}
 
-          {completedHabits >= Math.ceil(userData.habits.length * 0.7) && (
+          {userData.stats.completionPercentage >= 70 && (
             <div style={{ marginTop: '30px', padding: '15px', background: '#2a2547', borderRadius: '10px', textAlign: 'center', fontWeight: 'bold', border: `2px solid ${accentColor}` }}>
               🏆 Daily Goal Met! 70%+ habits completed
             </div>
