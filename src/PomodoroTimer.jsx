@@ -1741,6 +1741,34 @@ const PomodoroTimer = ({ user }) => {
             >
               Reset All Users
             </button>
+
+            <button
+              onClick={() => {
+                if (window.confirm('🚨 FACTORY RESET: Delete ALL data for ALL users? This cannot be undone!')) {
+                  const updated = JSON.parse(JSON.stringify(allUsers));
+                  USERS.forEach((userName) => {
+                    updated[userName] = createNewUserData();
+                    saveToFirebase(userName, updated[userName]);
+                  });
+                  setAllUsers(updated);
+                  setBonusTaskCompleted({});
+                  showToast('🔧 Factory reset complete! All data cleared.', 'success');
+                }
+              }}
+              style={{
+                marginLeft: '10px',
+                padding: '12px 24px',
+                background: '#8b0000',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontFamily: 'inherit',
+              }}
+            >
+              🚨 Factory Reset Everything
+            </button>
           </div>
         </div>
       )}
