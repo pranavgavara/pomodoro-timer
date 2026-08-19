@@ -2,6 +2,43 @@ import React, { useState, useEffect, useRef } from 'react';
 import { database } from './firebase';
 import { ref, onValue, set, update } from 'firebase/database';
 
+// Error Boundary
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('PomodoroTimer crashed:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: '100vh', background: '#0f0f1e', color: '#ff6b6b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', padding: '20px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '20px' }}>❌</div>
+          <div style={{ fontSize: '20px', marginBottom: '10px', fontWeight: 'bold' }}>App Crashed</div>
+          <div style={{ fontSize: '14px', color: '#c8b6ff', maxWidth: '500px', textAlign: 'center' }}>
+            <pre style={{ background: '#1a1a2e', padding: '15px', borderRadius: '8px', textAlign: 'left', overflow: 'auto' }}>
+              {this.state.error?.toString()}
+            </pre>
+          </div>
+          <button onClick={() => window.location.reload()} style={{ marginTop: '20px', padding: '10px 20px', background: '#c8b6ff', color: '#0f0f1e', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const PomodoroTimer = ({ user }) => {
   // Helper to get local date in YYYY-MM-DD format (not UTC)
   const getLocalDate = (date = new Date()) => {
@@ -1758,4 +1795,10 @@ const PomodoroTimer = ({ user }) => {
   );
 };
 
-export default PomodoroTimer;
+export default function PomodoroTimerWithErrorBoundary(props) {
+  return (
+    <ErrorBoundary>
+      <PomodoroTimer {...props} />
+    </ErrorBoundary>
+  );
+}
