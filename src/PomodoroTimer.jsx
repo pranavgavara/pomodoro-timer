@@ -842,41 +842,30 @@ const PomodoroTimer = ({ user }) => {
                 Only your data is editable. Compete with friends below.
               </p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="btn-secondary"
-              style={{ padding: 'var(--space-sm) var(--space-md)' }}
-            >
-              Logout
-            </button>
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-4" style={{ gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
-            <StatCard
-              icon="⭐"
-              label="Level"
-              value={userData.pomodoro.level}
-              loading={loading}
-            />
-            <StatCard
-              icon="✨"
-              label="Total XP"
-              value={userData.pomodoro.xp}
-              loading={loading}
-            />
-            <StatCard
-              icon="📊"
-              label="Today's Progress"
-              value={`${userData.stats.completionPercentage}%`}
-              loading={loading}
-            />
-            <StatCard
-              icon="⏰"
-              label="Reset In"
-              value={timeUntilReset.split('h')[0] + 'h'}
-              loading={loading}
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
+            <div style={{ background: 'var(--color-bg-secondary)', padding: 'var(--space-md)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', marginBottom: '8px' }}>⭐</div>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>Level</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{userData.pomodoro.level}</div>
+            </div>
+            <div style={{ background: 'var(--color-bg-secondary)', padding: 'var(--space-md)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', marginBottom: '8px' }}>✨</div>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>Total XP</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{userData.pomodoro.xp}</div>
+            </div>
+            <div style={{ background: 'var(--color-bg-secondary)', padding: 'var(--space-md)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', marginBottom: '8px' }}>📊</div>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>Today's Progress</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{userData.stats.completionPercentage}%</div>
+            </div>
+            <div style={{ background: 'var(--color-bg-secondary)', padding: 'var(--space-md)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏰</div>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>Reset In</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{timeUntilReset.split('h')[0]}h</div>
+            </div>
           </div>
 
           {/* Notifications & State */}
