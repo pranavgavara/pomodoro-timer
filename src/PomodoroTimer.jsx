@@ -274,6 +274,7 @@ const PomodoroTimer = ({ user }) => {
     const unsubscribe = onValue(historyRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
+        console.log('📊 [HISTORY LOADED] Raw data:', data);
         // Transform data: convert nested structure to date-keyed object
         const completionMap = {};
         Object.keys(data).forEach((dateStr) => {
@@ -285,12 +286,14 @@ const PomodoroTimer = ({ user }) => {
             };
           });
         });
+        console.log('📊 [COMPLETION MAP]:', completionMap);
         setCompletionHistory(completionMap);
       } else {
+        console.warn('📊 [HISTORY] No history data found in Firebase');
         setCompletionHistory({});
       }
     }, (error) => {
-      console.warn('Error loading history:', error);
+      console.error('❌ [HISTORY ERROR]:', error);
       setCompletionHistory({});
     });
     return unsubscribe;
@@ -397,6 +400,7 @@ const PomodoroTimer = ({ user }) => {
     const date = new Date();
     date.setDate(date.getDate() + dayOffset);
     const dateStr = getLocalDate(date);
+    console.log('💾 [SAVING HISTORY] Date:', dateStr, 'Offset:', dayOffset, 'Users:', Object.keys(allUsers));
 
     // Save full completion data for specified day
     const historyPromises = Object.keys(allUsers).map((userName) => {
@@ -405,15 +409,18 @@ const PomodoroTimer = ({ user }) => {
 
       // Save full data including all habits
       const completedCount = userData.habits.filter((h) => h.completed).length;
-
-      return set(historyRef, {
+      const dataToSave = {
         habits: userData.habits,
         completionPercentage: userData.stats.completionPercentage,
         completedCount: completedCount,
-        myloCompleted: false, // Will be updated if needed
+        myloCompleted: false,
         timestamp: date.toISOString(),
-      }).catch((err) => {
-        console.error('Error saving history for', userName, ':', err);
+      };
+
+      console.log(`💾 [SAVING] ${userName} - ${dateStr}:`, dataToSave.completionPercentage + '%');
+
+      return set(historyRef, dataToSave).catch((err) => {
+        console.error('❌ Error saving history for', userName, ':', err);
         return Promise.reject(err);
       });
     });
@@ -422,7 +429,7 @@ const PomodoroTimer = ({ user }) => {
       await Promise.all(historyPromises);
       console.log('✅ Daily completion saved for', dateStr);
     } catch (err) {
-      console.error('Failed to save some history records:', err);
+      console.error('❌ Failed to save some history records:', err);
     }
   };
 
