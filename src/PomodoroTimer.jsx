@@ -398,13 +398,19 @@ const PomodoroTimer = ({ user }) => {
     yesterday.setDate(yesterday.getDate() - 1);
     const dateStr = getLocalDate(yesterday);
 
-    // Save each user's completion status for yesterday - await all saves
+    // Save full completion data for yesterday
     const historyPromises = Object.keys(allUsers).map((userName) => {
       const userData = allUsers[userName];
       const historyRef = ref(database, `history/${dateStr}/${userName}`);
+
+      // Save full data including all habits
+      const completedCount = userData.habits.filter((h) => h.completed).length;
+
       return set(historyRef, {
-        completed: userData.stats.completionPercentage >= 70,
-        percentage: userData.stats.completionPercentage,
+        habits: userData.habits,
+        completionPercentage: userData.stats.completionPercentage,
+        completedCount: completedCount,
+        myloCompleted: false, // Will be updated if needed
         timestamp: yesterday.toISOString(),
       }).catch((err) => {
         console.error('Error saving history for', userName, ':', err);
@@ -414,6 +420,7 @@ const PomodoroTimer = ({ user }) => {
 
     try {
       await Promise.all(historyPromises);
+      console.log('✅ Daily completion saved for', dateStr);
     } catch (err) {
       console.error('Failed to save some history records:', err);
     }
@@ -1883,6 +1890,33 @@ const PomodoroTimer = ({ user }) => {
               }}
             >
               Force Daily Reset Now
+            </button>
+          </div>
+
+          {/* Save Today's Data to History */}
+          <div style={{ background: '#1a2a1a', padding: '20px', borderRadius: '12px', border: '2px solid #27ae60' }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: '#27ae60' }}>📊 Save Today's Data</div>
+            <button
+              onClick={async () => {
+                try {
+                  await saveDailyCompletion();
+                  showToast('✅ Today\'s data saved to history!', 'success');
+                } catch (err) {
+                  showToast('❌ Error saving history', 'error');
+                }
+              }}
+              style={{
+                padding: '10px 20px',
+                background: '#27ae60',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontFamily: 'inherit',
+              }}
+            >
+              Save Today's Completion to History
             </button>
           </div>
 
