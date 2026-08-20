@@ -83,6 +83,8 @@ const PomodoroTimer = ({ user }) => {
     return localStorage.getItem('calendarView') || 'week';
   });
   const [bonusTaskCompleted, setBonusTaskCompleted] = useState({});
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState(getLocalDate());
+  const [historyData, setHistoryData] = useState({});
 
   // Request browser notification permission
   const requestNotificationPermission = async () => {
@@ -250,6 +252,21 @@ const PomodoroTimer = ({ user }) => {
     localStorage.setItem('calendarView', calendarView);
   }, [calendarView]);
 
+  // Load history data for selected date
+  useEffect(() => {
+    const historyRef = ref(database, `history/${selectedHistoryDate}/${currentUser}`);
+    const unsubscribe = onValue(historyRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setHistoryData(snapshot.val());
+      } else {
+        setHistoryData({});
+      }
+    }, (error) => {
+      console.warn(`History data not found for ${selectedHistoryDate}:`, error);
+      setHistoryData({});
+    });
+    return unsubscribe;
+  }, [selectedHistoryDate, currentUser]);
 
   // Load data from Firebase
   useEffect(() => {
@@ -907,6 +924,7 @@ const PomodoroTimer = ({ user }) => {
         <div className="tab-nav">
           {[
             { id: 'habits', label: '🎯 Habits' },
+            { id: 'history', label: '📊 History' },
             { id: 'leaderboard', label: '🏆 Leaderboard' },
             ...(currentUser === 'GP47' ? [{ id: 'admin', label: '⚙️ Admin' }] : []),
           ].map((tab) => (
@@ -1517,6 +1535,63 @@ const PomodoroTimer = ({ user }) => {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* HISTORY TAB */}
+      {activeTab === 'history' && (
+        <div style={{ padding: '30px', maxWidth: '900px', margin: '0 auto' }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: accentColor }}>📊 History</div>
+          <div style={{ fontSize: '13px', color: '#999', marginBottom: '30px', textTransform: 'uppercase', letterSpacing: '1px' }}>View past days' completion data</div>
+
+          {/* Date Picker */}
+          <div className="card" style={{ marginBottom: '30px' }}>
+            <label style={{ display: 'block', marginBottom: '10px', fontSize: '14px', fontWeight: 'bold' }}>Select Date:</label>
+            <input
+              type="date"
+              value={selectedHistoryDate}
+              onChange={(e) => setSelectedHistoryDate(e.target.value)}
+              style={{
+                padding: '10px',
+                background: '#1a1a2e',
+                color: '#c8b6ff',
+                border: '2px solid #00d9ff',
+                borderRadius: '8px',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                cursor: 'pointer'
+              }}
+            />
+          </div>
+
+          {/* Historical Data */}
+          {Object.keys(historyData).length > 0 ? (
+            <div className="card">
+              <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: accentColor }}>
+                ✅ {selectedHistoryDate} - Completion Summary
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px' }}>
+                <div style={{ background: '#1a1a2e', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '5px' }}>Habits Completed</div>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#34d399' }}>{historyData.completedCount || 0}/8</div>
+                </div>
+                <div style={{ background: '#1a1a2e', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '5px' }}>Completion %</div>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#00d9ff' }}>{historyData.completionPercentage || 0}%</div>
+                </div>
+              </div>
+              <div style={{ background: '#1a1a2e', padding: '15px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>📝 Details:</div>
+                <div style={{ fontSize: '12px', color: '#ccc', whiteSpace: 'pre-wrap' }}>
+                  {JSON.stringify(historyData, null, 2)}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="card" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+              📭 No data found for {selectedHistoryDate}
+            </div>
+          )}
         </div>
       )}
 
