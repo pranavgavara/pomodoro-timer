@@ -268,6 +268,34 @@ const PomodoroTimer = ({ user }) => {
     return unsubscribe;
   }, [selectedHistoryDate]);
 
+  // Load all history data for calendar view
+  useEffect(() => {
+    const historyRef = ref(database, 'history');
+    const unsubscribe = onValue(historyRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        // Transform data: convert nested structure to date-keyed object
+        const completionMap = {};
+        Object.keys(data).forEach((dateStr) => {
+          completionMap[dateStr] = {};
+          Object.keys(data[dateStr]).forEach((userName) => {
+            completionMap[dateStr][userName] = {
+              completed: (data[dateStr][userName].completionPercentage || 0) >= 70,
+              completionPercentage: data[dateStr][userName].completionPercentage || 0,
+            };
+          });
+        });
+        setCompletionHistory(completionMap);
+      } else {
+        setCompletionHistory({});
+      }
+    }, (error) => {
+      console.warn('Error loading history:', error);
+      setCompletionHistory({});
+    });
+    return unsubscribe;
+  }, []);
+
   // Load data from Firebase
   useEffect(() => {
     const usersRef = ref(database, 'users');
