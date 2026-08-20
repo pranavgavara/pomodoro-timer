@@ -393,12 +393,12 @@ const PomodoroTimer = ({ user }) => {
     };
   }, []);
   // Save completion history when day changes
-  const saveDailyCompletion = async () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateStr = getLocalDate(yesterday);
+  const saveDailyCompletion = async (dayOffset = -1) => {
+    const date = new Date();
+    date.setDate(date.getDate() + dayOffset);
+    const dateStr = getLocalDate(date);
 
-    // Save full completion data for yesterday
+    // Save full completion data for specified day
     const historyPromises = Object.keys(allUsers).map((userName) => {
       const userData = allUsers[userName];
       const historyRef = ref(database, `history/${dateStr}/${userName}`);
@@ -411,7 +411,7 @@ const PomodoroTimer = ({ user }) => {
         completionPercentage: userData.stats.completionPercentage,
         completedCount: completedCount,
         myloCompleted: false, // Will be updated if needed
-        timestamp: yesterday.toISOString(),
+        timestamp: date.toISOString(),
       }).catch((err) => {
         console.error('Error saving history for', userName, ':', err);
         return Promise.reject(err);
@@ -1899,7 +1899,7 @@ const PomodoroTimer = ({ user }) => {
             <button
               onClick={async () => {
                 try {
-                  await saveDailyCompletion();
+                  await saveDailyCompletion(0);
                   showToast('✅ Today\'s data saved to history!', 'success');
                 } catch (err) {
                   showToast('❌ Error saving history', 'error');
