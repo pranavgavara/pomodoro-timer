@@ -252,9 +252,9 @@ const PomodoroTimer = ({ user }) => {
     localStorage.setItem('calendarView', calendarView);
   }, [calendarView]);
 
-  // Load history data for selected date
+  // Load history data for selected date (all users)
   useEffect(() => {
-    const historyRef = ref(database, `history/${selectedHistoryDate}/${currentUser}`);
+    const historyRef = ref(database, `history/${selectedHistoryDate}`);
     const unsubscribe = onValue(historyRef, (snapshot) => {
       if (snapshot.exists()) {
         setHistoryData(snapshot.val());
@@ -266,7 +266,7 @@ const PomodoroTimer = ({ user }) => {
       setHistoryData({});
     });
     return unsubscribe;
-  }, [selectedHistoryDate, currentUser]);
+  }, [selectedHistoryDate]);
 
   // Load data from Firebase
   useEffect(() => {
@@ -1540,56 +1540,128 @@ const PomodoroTimer = ({ user }) => {
 
       {/* HISTORY TAB */}
       {activeTab === 'history' && (
-        <div style={{ padding: '30px', maxWidth: '900px', margin: '0 auto' }}>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: accentColor }}>📊 History</div>
-          <div style={{ fontSize: '13px', color: '#999', marginBottom: '30px', textTransform: 'uppercase', letterSpacing: '1px' }}>View past days' completion data</div>
+        <div style={{ padding: '30px', maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: accentColor }}>📊 Daily Summary</div>
+          <div style={{ fontSize: '13px', color: '#999', marginBottom: '30px', textTransform: 'uppercase', letterSpacing: '1px' }}>View what all 4 users completed on any day</div>
 
           {/* Date Picker */}
-          <div className="card" style={{ marginBottom: '30px' }}>
-            <label style={{ display: 'block', marginBottom: '10px', fontSize: '14px', fontWeight: 'bold' }}>Select Date:</label>
+          <div className="card" style={{ marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 'bold' }}>📅 Select Date:</label>
             <input
               type="date"
               value={selectedHistoryDate}
               onChange={(e) => setSelectedHistoryDate(e.target.value)}
               style={{
-                padding: '10px',
+                padding: '10px 15px',
                 background: '#1a1a2e',
                 color: '#c8b6ff',
                 border: '2px solid #00d9ff',
                 borderRadius: '8px',
                 fontFamily: 'inherit',
                 fontSize: '14px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                flex: 1,
+                maxWidth: '200px'
               }}
             />
           </div>
 
-          {/* Historical Data */}
+          {/* Historical Data - All Users */}
           {Object.keys(historyData).length > 0 ? (
-            <div className="card">
-              <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px', color: accentColor }}>
-                ✅ {selectedHistoryDate} - Completion Summary
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '25px', color: accentColor, paddingBottom: '15px', borderBottom: '2px solid rgba(0, 217, 255, 0.2)' }}>
+                📈 {selectedHistoryDate} - All Users Performance
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px' }}>
-                <div style={{ background: '#1a1a2e', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '5px' }}>Habits Completed</div>
-                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#34d399' }}>{historyData.completedCount || 0}/8</div>
-                </div>
-                <div style={{ background: '#1a1a2e', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '5px' }}>Completion %</div>
-                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#00d9ff' }}>{historyData.completionPercentage || 0}%</div>
-                </div>
+
+              {/* User Cards Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '30px' }}>
+                {USERS.map((userName) => {
+                  const userHistory = historyData[userName];
+                  const userColor = userName === 'GP47' ? '#FF6B9D' : userName === 'Pri' ? '#00D9FF' : userName === 'Nikki' ? '#FFAA00' : '#7FFF00';
+
+                  if (!userHistory) {
+                    return (
+                      <div key={userName} className="card" style={{ opacity: 0.5 }}>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: userColor }}>
+                          {userName === 'GP47' ? '🚀' : userName === 'Pri' ? '🎯' : userName === 'Nikki' ? '✨' : '⚡'} {userName}
+                        </div>
+                        <div style={{ textAlign: 'center', color: '#999', padding: '20px' }}>No data</div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={userName} className="card" style={{ borderLeft: `4px solid ${userColor}` }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '15px', borderBottom: `1px solid rgba(${parseInt(userColor.slice(1,3), 16)}, ${parseInt(userColor.slice(3,5), 16)}, ${parseInt(userColor.slice(5,7), 16)}, 0.2)` }}>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', color: userColor }}>
+                          {userName === 'GP47' ? '🚀' : userName === 'Pri' ? '🎯' : userName === 'Nikki' ? '✨' : '⚡'} {userName}
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '12px', color: '#999' }}>Completion</div>
+                          <div style={{ fontSize: '20px', fontWeight: 'bold', color: userHistory.completionPercentage >= 70 ? '#34d399' : '#ff9d3d' }}>
+                            {userHistory.completionPercentage}%
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Habits List */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {userHistory.habits && userHistory.habits.map((habit, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', background: habit.completed ? 'rgba(52, 211, 153, 0.1)' : 'rgba(139, 146, 176, 0.05)', borderRadius: '6px' }}>
+                            <span style={{ fontSize: '16px' }}>{habit.completed ? '✅' : '❌'}</span>
+                            <span style={{ flex: 1, fontSize: '12px', color: habit.completed ? '#34d399' : '#999' }}>
+                              {habit.category} {habit.name}
+                            </span>
+                            {habit.sessionsCompleted > 0 && (
+                              <span style={{ fontSize: '10px', background: userColor, color: '#0f0f1e', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                                {habit.sessionsCompleted} sessions
+                              </span>
+                            )}
+                            {habit.count > 0 && (
+                              <span style={{ fontSize: '10px', background: userColor, color: '#0f0f1e', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
+                                {habit.count} count
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Mylo Bonus */}
+                      {userHistory.myloCompleted && (
+                        <div style={{ marginTop: '15px', padding: '10px', background: 'rgba(255, 157, 61, 0.1)', borderRadius: '6px', borderLeft: '3px solid #ff9d3d', fontSize: '12px', color: '#ff9d3d' }}>
+                          🐕 Mylo Bonus: +20 XP
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div style={{ background: '#1a1a2e', padding: '15px', borderRadius: '8px' }}>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '10px' }}>📝 Details:</div>
-                <div style={{ fontSize: '12px', color: '#ccc', whiteSpace: 'pre-wrap' }}>
-                  {JSON.stringify(historyData, null, 2)}
+
+              {/* Summary Stats */}
+              <div className="card" style={{ background: 'linear-gradient(135deg, rgba(0, 217, 255, 0.05) 0%, rgba(167, 139, 222, 0.05) 100%)' }}>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', color: accentColor }}>📊 Summary Statistics</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
+                  {USERS.map((userName) => {
+                    const userHistory = historyData[userName];
+                    return (
+                      <div key={userName} style={{ textAlign: 'center', padding: '15px', background: '#1a1a2e', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px' }}>{userName}</div>
+                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: userHistory ? '#34d399' : '#999', marginBottom: '5px' }}>
+                          {userHistory ? userHistory.completedCount : 0}/8
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#999' }}>Completed</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="card" style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-              📭 No data found for {selectedHistoryDate}
+            <div className="card" style={{ textAlign: 'center', padding: '60px 20px', color: '#999' }}>
+              <div style={{ fontSize: '40px', marginBottom: '15px' }}>📭</div>
+              <div style={{ fontSize: '16px', marginBottom: '5px' }}>No data found for {selectedHistoryDate}</div>
+              <div style={{ fontSize: '12px', color: '#666' }}>This date hasn't been logged yet. Select a different date.</div>
             </div>
           )}
         </div>
