@@ -1386,6 +1386,8 @@ const PomodoroTimer = ({ user }) => {
                       date.setDate(date.getDate() - (date.getDay() - idx - 1 + 7) % 7);
                       const dateStr = getLocalDate(date);
                       const dayHistory = completionHistory[dateStr] || {};
+                      if (idx === 0) console.log('📅 [CALENDAR WEEK VIEW] completionHistory:', completionHistory);
+                      console.log(`  ${day} (${dateStr}):`, dayHistory);
 
                       const userColors = {
                         'GP47': '#FF6B9D',
